@@ -1,7 +1,4 @@
-﻿__all__ = ["MinMaxScaler"]
-
-
-class MinMaxScaler:
+﻿class MinMaxScaler:
     @staticmethod
     def get_normalized_data(values, range_scale=1):
         min_value = min(values)
