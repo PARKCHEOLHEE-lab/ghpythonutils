@@ -5,27 +5,6 @@ from scriptcontext import sticky as st
 import Rhino.Geometry as rg
 import Rhino
 
-class TextHelper:
-    
-    custom_display = Rhino.Display.CustomDisplay(True)
-    
-    @staticmethod
-    def get_text(
-        string,
-        height,
-        string_place_origin=rg.Point3d(0, 0, 0), 
-        string_place_plane=rg.Plane.WorldXY
-    ):
-        string_place_plane.Origin = origin
-        string_object = Rhino.Display.Text3d(string, string_place_plane, height)
-        
-        
-        custom_display.AddText(
-            Rhino.Display.Text3d("test", plane, 2), 
-            Rhino.Display.ColorHSL(0, 0, 0)
-        )
-        return
-
 
 class ScorePolygon(MinMaxScaler, NumericHelper):
     """
@@ -189,17 +168,18 @@ if __name__ == "__main__":
     if "custom_display" not in globals():
         custom_display = Rhino.Display.CustomDisplay(True)
     
-    custom_display.Clear()
+#    custom_display.Clear()
+    
+    
     
     if not textviz:
-        custom_display.Dispose
+        custom_display.Dispose()
         del custom_display
     
     else:
         plane = rg.Plane.WorldXY
         plane.Origin = origin
         text = Rhino.Display.Text3d("Test", plane, 1)
-        color = Rhino.Display.ColorHSL(0, 0, 0)
+        color = Rhino.Display.ColorHSL(255, 255, 123)
         
         custom_display.AddText(text, color)
-

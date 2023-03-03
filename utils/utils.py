@@ -1,4 +1,5 @@
 ﻿import Rhino.Geometry as rg
+import Rhino.Display as rd
 import math
 
 
@@ -103,3 +104,43 @@ class PointHelper:
         return rg.Point3d(
             *[sum(coord_list) / len(points) for coord_list in zip(*points)]
         )
+
+
+class TextHelper:
+    def __init__(
+        self, 
+        string,
+        height,
+        string_place_origin=rg.Point3d(0, 0, 0), 
+        string_place_plane=rg.Plane.WorldXY
+    ):  
+        self.string = string
+        self.height = height
+        self.string_place_origin = string_place_origin
+        self.string_place_plane = string_place_plane
+        
+        if "custom_display" not in globals():
+            self.custom_display = rd.CustomDisplay(True)
+        
+    def visualize_text(self, toggle):
+        
+        if not toggle:
+            self.custom_display.Dispose()
+        
+        else:
+            self.string_place_plane.Origin = self.string_place_origin
+            text_3d = rd.Text3d(self.string, self.string_place_plane, self.height)
+            text_color = rd.ColorHSL(0, 0, 0)
+            self.custom_display.AddText(text_3d, text_color)
+            
+
+text_helper = TextHelper(
+    string="test", height=2, string_place_origin=rg.Point3d(0,20,0)
+)
+
+text_helper.visualize_text(x)
+
+a = 1
+asdf = 123123
+print(globals()["a"], globals()["asdf"], globals()["text_helper"].custom_display)
+print(vars())
