@@ -3,6 +3,9 @@ import Rhino.Display as rd
 import math
 
 
+CUSTOM_DISPLAY = "custom_display"
+
+
 class ConstsCollection:
     TOLERANCE = 0.001
 
@@ -29,14 +32,7 @@ class LineHelper:
         """Calculate angle between two points
 
         Args:
-            linestring (
-                Union[
-                    Rhino.Geometry.Curve, 
-                    Rhino.Geometry.PolylineCurve, 
-                    Rhino.Geometry.LineCurve,
-                    Rhino.Geometry.PolyCurve,
-                ]
-            ): Segment with only two points
+            linestring (Rhino.Geometry.Curve): Segment with only two points
             is_radians (bool, optional): If False return to degree. Defaults to True.
 
         Returns:
@@ -106,48 +102,103 @@ class PointHelper:
         )
 
 
-class TextHelper:
-    def __init__(
-        self, 
-        string,
-        height,
+class ColorHelper:
+    COLOR_BLACK = rd.ColorHSL(1, 0, 0, 0)
+    COLOR_GRAY = rd.ColorHSL(0.5, 0, 0, 0.5)
+    COLOR_RED = rd.ColorHSL(1, 0, 1, 0.5)
+    COLOR_GREEN = rd.ColorHSL(1, 0.333, 1, 0.5)
+    COLOR_BLUE = rd.ColorHSL(1, 0.666, 1, 0.5)
+
+
+class VisualizeHelper:
+    """
+    NOTE: If you RUN(F5) in ghpython scripting window, the text may not remove.
+    """
+    
+    @classmethod
+    def __initialize(cls):
+        if CUSTOM_DISPLAY not in globals():
+            globals()[CUSTOM_DISPLAY] = rd.CustomDisplay(True)
+    
+    @classmethod
+    def __dispose(cls):
+        globals()[CUSTOM_DISPLAY].Dispose()
+        del globals()[CUSTOM_DISPLAY]
+    
+    @staticmethod
+    def visualize_text(
+        string, 
+        height, 
+        toggle, 
+        color=ColorHelper.COLOR_BLACK,
         string_place_origin=rg.Point3d(0, 0, 0), 
         string_place_plane=rg.Plane.WorldXY
     ):  
-        """Text Visualization on the Rhino canvas
+        """Text visualization helper
 
         Args:
-            string (str): Text to visualze
+            string (str): Text to visualize
             height (float): Text size
-            string_place_origin (Rhino.Geometry.Point3d, optional): Text location. Defaults to rg.Point3d(0, 0, 0).
+            toggle (bool): Whether text visualization ON or OFF
+            color (Rhino.Display.ColorHSL, optional): Text color. Defaults to ColorHelper.COLOR_BLACK.
+            string_place_origin (Rhino.Geometry.Point3d, optional): Location of text. Defaults to rg.Point3d(0, 0, 0).
             string_place_plane (Rhino.Geometry.Plane, optional): Text direction. Defaults to rg.Plane.WorldXY.
         """
-
-        self.string = string
-        self.height = height
-        self.string_place_origin = string_place_origin
-        self.string_place_plane = string_place_plane
         
-        self.custom_display = "custom_display"
-        if self.custom_display not in globals():
-            globals()[self.custom_display] = rd.CustomDisplay(True)
-        
-    def visualize_text(self, toggle):
-        """Text visualization main method
+        VisualizeHelper.__initialize()
+        if not toggle:
+            VisualizeHelper.__dispose()
+        else:
+            string_place_plane.Origin = string_place_origin
+            text_3d = rd.Text3d(string, string_place_plane, height)
+            globals()[CUSTOM_DISPLAY].AddText(text_3d, color)
+    
+    @staticmethod
+    def visualize_curve(
+        curve, toggle, color=ColorHelper.COLOR_BLACK, thickness=1
+    ):
+        """Curve Visualization helper
 
         Args:
-            toggle (bool): Whether text visualization ON or OFF
+            curve (Rhino.Geometry.Curve): Curve to visualize
+            toggle (bool): Whether curve visualization ON or OFF
+            color (Rhino.Display.ColorHSL, optional): Curve color. Defaults to ColorHelper.COLOR_BLACK.
+            thickness (int, optional): Curve display thickness. Defaults to 1.
+        """
+        
+        VisualizeHelper.__initialize()
+        if not toggle:
+            VisualizeHelper.__dispose()
+        else:
+            globals()[CUSTOM_DISPLAY].AddCurve(curve, color, thickness)
+    
+    @staticmethod
+    def visualize_polygon(
+        polygon, 
+        toggle,
+        fill_color=ColorHelper.COLOR_GRAY, 
+        edge_color=ColorHelper.COLOR_BLACK, 
+        draw_fill=True,
+        draw_edge=True,
+    ):
+        """Polygon visualization helper
+
+        Args:
+            polygon (List[Point3d]): Polygon to visualize
+            toggle (bool): Whether polygon visualization ON or OFF
+            fill_color (Rhino.Display.ColorHSL, optional): _description_. Defaults to ColorHelper.COLOR_GRAY.
+            edge_color (Rhino.Display.ColorHSL, optional): _description_. Defaults to ColorHelper.COLOR_BLACK.
+            draw_fill (bool, optional): Whether polygon inside fill. Defaults to True.
+            draw_edge (bool, optional): Whether polygon edge visualization. Defaults to True.
             
         NOTE:
-            If you RUN(F5) in ghpython scripting window, the text may not remove.
+            This function is incomplete. Sometimes the concave part of the polygon is convexly filled
         """
 
+        VisualizeHelper.__initialize()
         if not toggle:
-            globals()[self.custom_display].Dispose()
-            del globals()[self.custom_display]
-        
+            VisualizeHelper.__dispose()
         else:
-            self.string_place_plane.Origin = self.string_place_origin
-            text_3d = rd.Text3d(self.string, self.string_place_plane, self.height)
-            text_color = rd.ColorHSL(0, 0, 0)
-            globals()[self.custom_display].AddText(text_3d, text_color)
+            globals()[CUSTOM_DISPLAY].AddPolygon(
+                polygon, fill_color, edge_color, draw_fill, draw_edge
+            )

@@ -1,35 +1,56 @@
-﻿from scaler.minmaxscaler import MinMaxScaler
-from utils.utils import NumericHelper
-
-from scriptcontext import sticky as st
-import Rhino.Geometry as rg
-import Rhino
+﻿import Rhino.Geometry as rg
+import Rhino.Display as rd
+from scaler.minmaxscaler import MinMaxScaler
+from utils.utils import NumericHelper, VisualizeHelper, ColorHelper
 
 
-class ScorePolygon(MinMaxScaler, NumericHelper):
+
+class ScorePolygon(MinMaxScaler, NumericHelper, VisualizeHelper, ColorHelper):
     """
     To use the inherited module, refer the link below.
     https://github.com/PARKCHEOLHEE-lab/GhPythonUtils
     """
     
     tolerance = 1e-3
+    circle_count = 6
     
-    def __init__(self, origin, rad=5, scoredict={}):
+    def __init__(
+        self, 
+        origin, 
+        rad=5, 
+        scoredict={}, 
+        toggle=False, 
+        color=rd.ColorHSL(0.7, 0.333, 1, 0.5)
+    ):
+        """Score polygon to visualize given scores of Each element
+
+        Args:
+            origin (Rhino.Geometry.Point3d): Origin of Score polygon
+            rad (int, optional): Size of the score polygon. Defaults to 5.
+            scoredict (dict, optional): Dictionary to visualize. Defaults to {}.
+            toggle (bool, optional): Whether visualization. Defaults to False.
+            color (Rhino.Display.ColorHSL, optional): Score polygon color. Defaults to rd.ColorHSL(0.7, 0.333, 1, 0.5).
+        """
+
         self.origin = origin
         self.rad = rad
         self.scoredict = scoredict
         self.score_length = len(self.scoredict.values())
+        self.toggle = toggle
+        self.text_size = rad * 0.05
+        self.color = color
         
-        self.is_added_dummies = False
         if self.score_length <= 2:
             self.scoredict = self.get_scoredict_included_dummies(self.scoredict)
             self.score_length = len(self.scoredict.values())
-            self.is_added_dummies = True
 
         MinMaxScaler.__init__(self)
         NumericHelper.__init__(self)
+        VisualizeHelper.__init__(self)
+        ColorHelper.__init__(self)
         
-        self.circles = self.get_base_circles(self.origin, self.rad)
+        self.sub_circle_rad = self.rad / self.circle_count
+        self.circles = self.get_base_circles(self.origin, self.sub_circle_rad)
         self.outer_circle = self.circles[-1:]
         self.inner_circle = self.circles[:-1]
         
@@ -41,26 +62,59 @@ class ScorePolygon(MinMaxScaler, NumericHelper):
             self.inner_circle, self.score_length
         )
         
-        self.scorepolygon, self.scorepolygon_vertices = self.get_scorepolygon(
+        (
+            self.scorepolygon, 
+            self.scorepolygon_vertices, 
+            self.sublines
+        ) = self.get_scorepolygon(
             self.origin, 
             self.rad, 
-            self.main_polygon, 
+            self.main_polygon[0], 
             self.scoredict, 
-            self.is_added_dummies
+            self.sub_circle_rad,
+        )
+        
+        self.visualize(
+            self.scoredict, 
+            self.scorepolygon,
+            self.scorepolygon_vertices, 
+            self.main_polygon_points[0], 
+            self.main_polygon + self.inner_polygons,
+            self.sublines,
+            self.outer_circle[0],
+            self.toggle,
+            self.text_size,
+            self.color,
         )
         
     def get_scoredict_included_dummies(self, scoredict):
+        """Create dummy elements when length of `scoredict` less than 3 
+
+        Args:
+            scoredict (dict): Dictionary to visualize.
+
+        Returns:
+            dict: Dictionary to visualize, included dummies.
+        """
+
         needed_dummies_count = 3 - self.score_length
         for dummy_count in range(needed_dummies_count):
             scoredict["dummy_{}".format(dummy_count)] = self.tolerance
         return scoredict
         
-    def get_base_circles(self, origin, rad):
-        circle_count = 5
-        sub_circle_rad = rad / circle_count
-        
+    def get_base_circles(self, origin, sub_circle_rad):
+        """Create circles to make score polygons
+
+        Args:
+            origin (Rhino.Geometry.Point3d): Origin of Score polygon
+            sub_circle_rad (float): Interval to make circles 
+
+        Returns:
+            List[Rhino.Geometry.Circle]: Base circles for making score polygons
+        """
+
         circles = []
-        for count in range(1, circle_count + 1):
+        for count in range(1, self.circle_count + 1):
             each_rad = sub_circle_rad * count
             circle = rg.Circle(origin, each_rad).ToNurbsCurve()
             circles.append(circle)
@@ -68,6 +122,17 @@ class ScorePolygon(MinMaxScaler, NumericHelper):
         return circles
         
     def get_polygon(self, circles, score_length, is_return_points=False):
+        """Create polygon via separated points of given circles
+
+        Args:
+            circles (List[Rhino.Geometry.Circle]): Circles to make polygon
+            score_length (int): length of values of `scoredict`
+            is_return_points (bool, optional): Whether return polygon vertices. Defaults to False.
+
+        Returns:
+            Rhino.Geometry.PolylineCurve: Polygon created
+        """
+        
         polygons = []
         all_divided_points = []
         for circle in circles:
@@ -88,98 +153,135 @@ class ScorePolygon(MinMaxScaler, NumericHelper):
         return polygons
         
     def get_scorepolygon(
-        self, origin, rad, main_polygon, scoredict, is_added_dummies
+        self, 
+        origin, 
+        rad, 
+        main_polygon, 
+        scoredict, 
+        sub_circle_rad
     ):
+        """Create score polygon
+
+        Args:
+            origin (Rhino.Geometry.Point3d): Origin of Score polygon
+            rad (int): Size of the score polygon.
+            main_polygon (Rhino.Geometry.PolylineCurve): Most outer polygon
+            scoredict (dict): Dictionary to visualize
+            sub_circle_rad (float): Interval to make circles 
+
+        Returns:
+            Tuple[
+                Rhino.Geometry.Brep,
+                List[Rhino.Geometry.Point3d],
+                List[Rhino.Geometry.Line]
+            ]: For visualization data
+        """
+        
         score_values = scoredict.values()
         normalized_score_values = self.get_normalized_data(
-            score_values, range_scale=rad
+            score_values, range_scale=rad - sub_circle_rad * 2
         )
         
-        sorted_score_values = sorted(score_values)
-        second_minimum_value = sorted(list(set(sorted_score_values)))[1]
-        ratio = min(score_values) / second_minimum_value
-        
-        sorted_normalized_score_values = sorted(normalized_score_values)
-        normalized_second_minimum_value = sorted(list(set(normalized_score_values)))[1]
-        
-        print(ratio, second_minimum_value)
-        print(normalized_second_minimum_value)
+        sublines = []
         scorepolygon_vertices = []
         for segment, normalized_score_value in zip(
-            main_polygon[0].DuplicateSegments(), normalized_score_values
+            main_polygon.DuplicateSegments(), normalized_score_values
         ):  
             
-            if (
-                self.is_close(0, normalized_score_value) 
-                and not is_added_dummies
-            ):
-                normalized_score_value = normalized_second_minimum_value * ratio
+            origin_to_each_vertex_curve = rg.Line(
+                origin, segment.PointAtStart
+            ).ToNurbsCurve()
             
-            origin_to_each_vertex = rg.Line(origin, segment.PointAtStart)
-            scorepolygon_vertices.append(
-                origin_to_each_vertex.PointAtLength(normalized_score_value)
+            origin_to_each_vertex_curve_subline = rg.Line(
+                origin_to_each_vertex_curve.PointAtLength(sub_circle_rad),
+                origin_to_each_vertex_curve.PointAtLength(
+                    origin_to_each_vertex_curve.GetLength() - sub_circle_rad
+                )
             )
+            
+            sublines.append(origin_to_each_vertex_curve_subline)
+            
+            scorepolygon_vertices.append(
+                origin_to_each_vertex_curve_subline.PointAtLength(
+                    normalized_score_value
+                )
+            )
+            
         scorepolygon_vertices.append(scorepolygon_vertices[0])
-        
         scorepolygon_curve = rg.PolylineCurve(scorepolygon_vertices)
-        scorepolygon = rg.Brep.CreatePlanarBreps(scorepolygon_curve)
+        scorepolygon = rg.Brep.CreatePlanarBreps(scorepolygon_curve)[0]
         
         if scorepolygon is None:
-            return scorepolygon_curve, scorepolygon_vertices[:-1]
+            return scorepolygon_curve, scorepolygon_vertices
         
-        return scorepolygon, scorepolygon_vertices[:-1]
+        return scorepolygon, scorepolygon_vertices, sublines
+        
+    def visualize(
+        self, 
+        scoredict, 
+        scorepolygon,
+        scorepolygon_vertices, 
+        main_polygon_points, 
+        polygons,
+        sublines,
+        outer_circle,
+        toggle, 
+        text_size,
+        color,
+    ):
+        """Visualization function
 
-if __name__ == "__main__":
-    import random
-    
-    scoredict = {
-        "1": -random.random(),
-        "2": -random.random(),
-        "3": random.random(),
-        "4": random.random(),
-        "5": random.random(),
-        "6": random.random(),
-    }
-    
-    scoredict = {
-        "R2": -8.5,
-        "R3": -2,
-        "R1": -1,
-        "R4": -3.7,
-        "R5": -8.5,
-    }
-    
-    scp = ScorePolygon(origin, rad=7, scoredict=scoredict)
-    a, b, c, d = (
-        scp.outer_circle, 
-        scp.main_polygon, 
-        scp.inner_polygons, 
-        scp.scorepolygon
-    )
-    
-    e = scp.main_polygon_points[0]
-    f = scp.scoredict.keys()
-    
-    g = scp.scorepolygon_vertices
-    h = scp.scoredict.values()
-    
-    print(len(g))
-    
-    if "custom_display" not in globals():
-        custom_display = Rhino.Display.CustomDisplay(True)
-    
-#    custom_display.Clear()
-    
-    
-    
-    if not textviz:
-        custom_display.Dispose()
-        del custom_display
-    
-    else:
-        plane = rg.Plane.WorldXY
-        plane.Origin = origin
-        text = Rhino.Display.Text3d("Test", plane, 1)
-        color = Rhino.Display.ColorHSL(255, 255, 123)
+        Args:
+            scoredict (dict): Dictionary to visualize.
+            scorepolygon (Rhino.Geometry.Brep): Score polygon
+            scorepolygon_vertices (List[Rhino.Geometry.Point3d]): Vertices of score polygon
+            main_polygon_points (List[Rhino.Geometry.Point3d]): Vertices of Most outer polygon
+            polygons (List[Rhino.Geometry.PolylineCurve]): All polygons
+            sublines (List[Rhino.Geometry.Line]): Lines that connects the origin and each vertex
+            outer_circle (Rhino.Geometry.Circle): Most outer circle
+            toggle (bool): Whether visualization
+            text_size (float): Text size
+            color (Rhino.Display.ColorHSL): Score polygon color
+        """
         
-        custom_display.AddText(text, color)
+        for edge in scorepolygon.Edges:
+            self.visualize_curve(
+                edge.ToNurbsCurve(), 
+                toggle, 
+                color=color,
+                thickness=5
+            )
+        
+#        self.visualize_polygon(
+#            scorepolygon_vertices, toggle, fill_color=color, draw_edge=True
+#        )
+        
+        for curve in sublines + polygons + [outer_circle]:
+            if isinstance(curve, rg.Line):
+                curve = curve.ToNurbsCurve()
+                
+            self.visualize_curve(
+                curve.ToNurbsCurve(), toggle, color=self.COLOR_GRAY
+            )
+
+        for key, main_polygon_point in zip(
+            scoredict.keys(), main_polygon_points
+        ):
+            self.visualize_text(
+                key, 
+                text_size * 1.5, 
+                toggle, 
+                color=self.COLOR_GRAY,
+                string_place_origin=main_polygon_point
+            )
+    
+        for value, scorepolygon_vertex in zip(
+            scoredict.values(), scorepolygon_vertices
+        ):
+            self.visualize_text(
+                str(value), 
+                text_size, 
+                toggle, 
+                color=self.COLOR_BLACK, 
+                string_place_origin=scorepolygon_vertex
+            )
