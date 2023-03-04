@@ -114,33 +114,40 @@ class TextHelper:
         string_place_origin=rg.Point3d(0, 0, 0), 
         string_place_plane=rg.Plane.WorldXY
     ):  
+        """Text Visualization on the Rhino canvas
+
+        Args:
+            string (str): Text to visualze
+            height (float): Text size
+            string_place_origin (Rhino.Geometry.Point3d, optional): Text location. Defaults to rg.Point3d(0, 0, 0).
+            string_place_plane (Rhino.Geometry.Plane, optional): Text direction. Defaults to rg.Plane.WorldXY.
+        """
+
         self.string = string
         self.height = height
         self.string_place_origin = string_place_origin
         self.string_place_plane = string_place_plane
         
-        if "custom_display" not in globals():
-            self.custom_display = rd.CustomDisplay(True)
+        self.custom_display = "custom_display"
+        if self.custom_display not in globals():
+            globals()[self.custom_display] = rd.CustomDisplay(True)
         
     def visualize_text(self, toggle):
-        
+        """Text visualization main method
+
+        Args:
+            toggle (bool): Whether text visualization ON or OFF
+            
+        NOTE:
+            If you RUN(F5) in ghpython scripting window, the text may not remove.
+        """
+
         if not toggle:
-            self.custom_display.Dispose()
+            globals()[self.custom_display].Dispose()
+            del globals()[self.custom_display]
         
         else:
             self.string_place_plane.Origin = self.string_place_origin
             text_3d = rd.Text3d(self.string, self.string_place_plane, self.height)
             text_color = rd.ColorHSL(0, 0, 0)
-            self.custom_display.AddText(text_3d, text_color)
-            
-
-text_helper = TextHelper(
-    string="test", height=2, string_place_origin=rg.Point3d(0,20,0)
-)
-
-text_helper.visualize_text(x)
-
-a = 1
-asdf = 123123
-print(globals()["a"], globals()["asdf"], globals()["text_helper"].custom_display)
-print(vars())
+            globals()[self.custom_display].AddText(text_3d, text_color)
