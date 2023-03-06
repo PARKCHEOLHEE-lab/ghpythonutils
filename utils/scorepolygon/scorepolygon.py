@@ -1,6 +1,6 @@
 ﻿import Rhino.Geometry as rg
 import Rhino.Display as rd
-from scaler.minmaxscaler import MinMaxScaler
+from utils.scaler.minmaxscaler import MinMaxScaler
 from utils.utils import NumericHelper, VisualizeHelper, ColorHelper
 
 

@@ -1,7 +1,10 @@
-﻿import Rhino.Geometry as rg
+﻿import rhinoscriptsyntax as rs
+import Rhino.Geometry as rg
 import Rhino.Display as rd
 import math
+import copy
 
+import ghpythonlib.components as gh
 
 CUSTOM_DISPLAY = "custom_display"
 
@@ -46,7 +49,24 @@ class LineHelper:
         if is_radians:
             return angle
         
-        return math.degrees(self.sun_facing_angle)
+        return math.degrees(angle)
+    
+    @staticmethod
+    def get_2d_obb_from_line(linestring, geom):
+        angle = LineHelper.get_line_2d_angle(linestring)
+        anchor = geom.ToPolyline().CenterPoint()
+        
+        negative_transform = rg.Transform.Rotation(-angle, anchor)
+        positive_transform = rg.Transform.Rotation(angle, anchor)
+        
+        copied_geom = copy.copy(geom)
+        copied_geom.Transform(negative_transform)
+        
+        obb = copied_geom.GetBoundingBox(rg.Plane.WorldXY)
+        obb = rg.Rectangle3d(rg.Plane.WorldXY, obb.Min, obb.Max)
+        obb.Transform(positive_transform)
+        
+        return obb
 
 
 class NumericHelper:
@@ -79,10 +99,12 @@ class SurfaceHelper:
         """
         
         interval = rg.Interval(0, 1)
-        srf.SetDomain(0, interval)
-        srf.SetDomain(1, interval)
         
-        return srf
+        copied_srf = copy.copy(srf)
+        copied_srf.SetDomain(0, interval)
+        copied_srf.SetDomain(1, interval)
+        
+        return copied_srf
 
 
 class PointHelper:
@@ -202,3 +224,7 @@ class VisualizeHelper:
             globals()[CUSTOM_DISPLAY].AddPolygon(
                 polygon, fill_color, edge_color, draw_fill, draw_edge
             )
+
+
+if __name__ == "__main__":
+    a = LineHelper.get_2d_obb_from_line(x, y)
