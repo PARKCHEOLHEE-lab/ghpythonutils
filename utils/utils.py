@@ -13,6 +13,14 @@ class ConstsCollection:
     TOLERANCE = 0.001
 
 
+class ColorsCollection:
+    COLOR_BLACK = rd.ColorHSL(1, 0, 0, 0)
+    COLOR_GRAY = rd.ColorHSL(0.5, 0, 0, 0.5)
+    COLOR_RED = rd.ColorHSL(1, 0, 1, 0.5)
+    COLOR_GREEN = rd.ColorHSL(1, 0.333, 1, 0.5)
+    COLOR_BLUE = rd.ColorHSL(1, 0.666, 1, 0.5)
+
+
 class Enum:
     @staticmethod
     def enum(*names):
@@ -53,6 +61,15 @@ class LineHelper:
     
     @staticmethod
     def get_2d_obb_from_line(linestring, geom):
+        """Create an oriented bounding box by given axis of linestring 
+
+        Args:
+            linestring (Rhino.Geometry.Curve): Alignment axis
+            geom (Rhino.Geometry.Curve): Geometry to create the obb
+
+        Returns:
+            Rhino.Geometry.Curve: Oriented bounding box aligned to given line axis
+        """
         angle = LineHelper.get_line_2d_angle(linestring)
         anchor = geom.ToPolyline().CenterPoint()
         
@@ -88,7 +105,7 @@ class NumericHelper:
 
 class SurfaceHelper:
     @staticmethod
-    def surface_reparameterize(srf):
+    def get_reparameterized_surface(srf):
         """Change domain to 0 ~ 1 given surface
 
         Args:
@@ -124,14 +141,6 @@ class PointHelper:
         )
 
 
-class ColorHelper:
-    COLOR_BLACK = rd.ColorHSL(1, 0, 0, 0)
-    COLOR_GRAY = rd.ColorHSL(0.5, 0, 0, 0.5)
-    COLOR_RED = rd.ColorHSL(1, 0, 1, 0.5)
-    COLOR_GREEN = rd.ColorHSL(1, 0.333, 1, 0.5)
-    COLOR_BLUE = rd.ColorHSL(1, 0.666, 1, 0.5)
-
-
 class VisualizeHelper:
     """
     NOTE: If you RUN(F5) in ghpython scripting window, the text may not remove.
@@ -152,7 +161,7 @@ class VisualizeHelper:
         string, 
         height, 
         toggle, 
-        color=ColorHelper.COLOR_BLACK,
+        color=ColorsCollection.COLOR_BLACK,
         string_place_origin=rg.Point3d(0, 0, 0), 
         string_place_plane=rg.Plane.WorldXY
     ):  
@@ -177,7 +186,7 @@ class VisualizeHelper:
     
     @staticmethod
     def visualize_curve(
-        curve, toggle, color=ColorHelper.COLOR_BLACK, thickness=1
+        curve, toggle, color=ColorsCollection.COLOR_BLACK, thickness=1
     ):
         """Curve Visualization helper
 
@@ -198,8 +207,8 @@ class VisualizeHelper:
     def visualize_polygon(
         polygon, 
         toggle,
-        fill_color=ColorHelper.COLOR_GRAY, 
-        edge_color=ColorHelper.COLOR_BLACK, 
+        fill_color=ColorsCollection.COLOR_GRAY, 
+        edge_color=ColorsCollection.COLOR_BLACK, 
         draw_fill=True,
         draw_edge=True,
     ):
@@ -208,8 +217,8 @@ class VisualizeHelper:
         Args:
             polygon (List[Point3d]): Polygon to visualize
             toggle (bool): Whether polygon visualization ON or OFF
-            fill_color (Rhino.Display.ColorHSL, optional): _description_. Defaults to ColorHelper.COLOR_GRAY.
-            edge_color (Rhino.Display.ColorHSL, optional): _description_. Defaults to ColorHelper.COLOR_BLACK.
+            fill_color (Rhino.Display.ColorHSL, optional): Polygon's inner color. Defaults to ColorHelper.COLOR_GRAY.
+            edge_color (Rhino.Display.ColorHSL, optional): Polygon's edge color. Defaults to ColorHelper.COLOR_BLACK.
             draw_fill (bool, optional): Whether polygon inside fill. Defaults to True.
             draw_edge (bool, optional): Whether polygon edge visualization. Defaults to True.
             

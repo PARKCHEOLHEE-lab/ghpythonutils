@@ -1,11 +1,11 @@
 ﻿import Rhino.Geometry as rg
 import Rhino.Display as rd
 from utils.scaler.minmaxscaler import MinMaxScaler
-from utils.utils import NumericHelper, VisualizeHelper, ColorHelper
+from utils.utils import NumericHelper, VisualizeHelper, ColorsCollection
 
 
 
-class ScorePolygon(MinMaxScaler, NumericHelper, VisualizeHelper, ColorHelper):
+class ScorePolygon(MinMaxScaler, NumericHelper, VisualizeHelper, ColorsCollection):
     """
     To use the inherited module, refer the link below.
     https://github.com/PARKCHEOLHEE-lab/GhPythonUtils
@@ -47,7 +47,7 @@ class ScorePolygon(MinMaxScaler, NumericHelper, VisualizeHelper, ColorHelper):
         MinMaxScaler.__init__(self)
         NumericHelper.__init__(self)
         VisualizeHelper.__init__(self)
-        ColorHelper.__init__(self)
+        ColorsCollection.__init__(self)
         
         self.sub_circle_rad = self.rad / self.circle_count
         self.circles = self.get_base_circles(self.origin, self.sub_circle_rad)
