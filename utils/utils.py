@@ -84,6 +84,16 @@ class LineHelper:
         obb.Transform(positive_transform)
         
         return obb
+        
+    @staticmethod
+    def get_shortest_segment(linestring):
+        exploded_linestring = linestring.DuplicateSegments()
+        sorted_linestring = sorted(
+            exploded_linestring, key=lambda l: l.GetLength()
+        )
+        shortest_segment = sorted_linestring[0]
+        
+        return shortest_segment
 
 
 class NumericHelper:
@@ -233,7 +243,3 @@ class VisualizeHelper:
             globals()[CUSTOM_DISPLAY].AddPolygon(
                 polygon, fill_color, edge_color, draw_fill, draw_edge
             )
-
-
-if __name__ == "__main__":
-    a = LineHelper.get_2d_obb_from_line(x, y)
