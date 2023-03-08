@@ -21,8 +21,12 @@ class KRoomsCluster(KMeans, LineHelper):
         
     def predict(self):
         self._gen_given_axis_aligned_obb()
+        self._gen_boundary()
         self._gen_estimated_grid_size()
         self._gen_grid()
+        
+    def _gen_boundary(self):
+        self.boundary = rg.Curve.CreateBooleanDifference(self.floor, self.core)[0]
         
     def _gen_given_axis_aligned_obb(self):
         if self.axis is None:
@@ -82,7 +86,12 @@ class KRoomsCluster(KMeans, LineHelper):
             for y in range(y_count):
                 copied_rectangle = copy.copy(rectangle)
                 copied_rectangle.Translate(y_vector * y)
-                self.grid.append(copied_rectangle)
+                
+                cleanup_rectangle = rg.Curve.CreateBooleanIntersection(
+                    self.boundary, copied_rectangle.ToNurbsCurve()
+                )
+                if len(cleanup_rectangle) == 1:
+                    self.grid.append(cleanup_rectangle[0])
         
     def _gen_estimated_k(self):
         """The K is given floor area divided target area."""
@@ -103,3 +112,4 @@ if __name__ == "__main__":
     krooms.predict()
 
     a = krooms.grid
+    b = krooms.boundary
