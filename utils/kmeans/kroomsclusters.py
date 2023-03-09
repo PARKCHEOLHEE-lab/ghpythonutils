@@ -3,31 +3,62 @@ from utils.utils import LineHelper
 import Rhino.Geometry as rg
 import copy
 
+
+class Boundary:
+    """
+    _description_
+    """
+    
+    def __init__(self, boundary, target_area):
+        self.boundary = boundary
+        self.boundary_area = rg.AreaMassProperties.Compute(boundary).Area
+        self.target_area = target_area
+        
+        self._gen_estimated_k()
+        
+    def _gen_estimated_k(self):
+        """The K is given floor area divided target area."""
+        self.k = int(self.boundary_area / self.target_area)
+        print(self.boundary_area , self.target_area)
+        
+        print(self.k)
+
+
 class KRoomsCluster(KMeans, LineHelper):
     """
     To use the inherited moduels, refer the link below.
     https://github.com/PARKCHEOLHEE-lab/GhPythonUtils
     """
     
-    def __init__(self, floor, core, hall, target_area, axis=None):
+    def __init__(
+        self, floor, core, hall, target_area, axis=None, grid_size=None
+    ):
         self.floor = floor
         self.core = core
         self.hall = hall
         self.target_area = target_area
         self.axis = axis
+        self.grid_size = grid_size
         
         KMeans.__init__(self)
         LineHelper.__init__(self)
         
     def predict(self):
         self._gen_given_axis_aligned_obb()
-        self._gen_boundary()
+        self._gen_boundaries()
         self._gen_estimated_grid_size()
         self._gen_grid()
         
-    def _gen_boundary(self):
-        self.boundary = rg.Curve.CreateBooleanDifference(self.floor, self.core)[0]
+    def _gen_boundaries(self):
+        self.boundaries = rg.Curve.CreateBooleanDifference(
+            self.floor, self.core
+        )
         
+        self.boundaries_objects = []
+        for boundary in self.boundaries:
+            boundary_object = Boundary(boundary, self.target_area)
+            self.boundaries_objects.append(boundary_object)
+            
     def _gen_given_axis_aligned_obb(self):
         if self.axis is None:
             self.axis = self.hall.DuplicateSegments()[0]
@@ -43,8 +74,9 @@ class KRoomsCluster(KMeans, LineHelper):
            self.obb.Reverse()
         
     def _gen_estimated_grid_size(self):
-        hall_shortest_segment = self.get_shortest_segment(self.hall)
-        self.grid_size = hall_shortest_segment.GetLength()
+        if self.grid_size is None:
+            hall_shortest_segment = self.get_shortest_segment(self.hall)
+            self.grid_size = hall_shortest_segment.GetLength()
         
     def _gen_grid(self):
         self.x_segment, self.y_segment = self.obb.DuplicateSegments()[:2]
@@ -87,15 +119,17 @@ class KRoomsCluster(KMeans, LineHelper):
                 copied_rectangle = copy.copy(rectangle)
                 copied_rectangle.Translate(y_vector * y)
                 
-                cleanup_rectangle = rg.Curve.CreateBooleanIntersection(
-                    self.boundary, copied_rectangle.ToNurbsCurve()
-                )
-                if len(cleanup_rectangle) == 1:
-                    self.grid.append(cleanup_rectangle[0])
-        
-    def _gen_estimated_k(self):
-        """The K is given floor area divided target area."""
-        self.k = 0
+                cleanup_rectangles = []
+                for boundary in self.boundaries:
+                    clean_up_rectangle = list(
+                        rg.Curve.CreateBooleanIntersection(
+                            boundary, copied_rectangle.ToNurbsCurve()
+                        )
+                    )
+                    
+                    cleanup_rectangles.extend(clean_up_rectangle)
+                    
+                self.grid.extend(cleanup_rectangles)
         
     def _gen_shortest_path(self):
         return
@@ -106,10 +140,11 @@ if __name__ == "__main__":
         floor=floor,
         core=core,
         hall=hall,
-        target_area=None,
+        target_area=40,
+        grid_size=None
     )
     
     krooms.predict()
 
     a = krooms.grid
-    b = krooms.boundary
+    b = krooms.boundaries
