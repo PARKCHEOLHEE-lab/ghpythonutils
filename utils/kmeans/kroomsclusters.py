@@ -4,6 +4,17 @@ import Rhino.Geometry as rg
 import copy
 
 
+class Room:
+    """
+    _description_
+    """
+    
+    
+    def __init__(self, boundary, path):
+        self.boundary = boundary
+        self.path = path
+
+
 class Boundary:
     """
     _description_
@@ -19,9 +30,9 @@ class Boundary:
     def _gen_estimated_k(self):
         """The K is given floor area divided target area."""
         self.k = int(self.boundary_area / self.target_area)
-        print(self.boundary_area , self.target_area)
         
-        print(self.k)
+    def _gen_shortest_path(self):
+        pass
 
 
 class KRoomsCluster(KMeans, LineHelper):
@@ -36,6 +47,7 @@ class KRoomsCluster(KMeans, LineHelper):
         self.floor = floor
         self.core = core
         self.hall = hall
+        self.sorted_hall_segments = self.get_sorted_segment(self.hall)
         self.target_area = target_area
         self.axis = axis
         self.grid_size = grid_size
@@ -48,16 +60,17 @@ class KRoomsCluster(KMeans, LineHelper):
         self._gen_boundaries()
         self._gen_estimated_grid_size()
         self._gen_grid()
+        self._gen_grid_2()
         
     def _gen_boundaries(self):
-        self.boundaries = rg.Curve.CreateBooleanDifference(
+        boundaries = rg.Curve.CreateBooleanDifference(
             self.floor, self.core
         )
         
-        self.boundaries_objects = []
-        for boundary in self.boundaries:
+        self.boundaries = []
+        for boundary in boundaries:
             boundary_object = Boundary(boundary, self.target_area)
-            self.boundaries_objects.append(boundary_object)
+            self.boundaries.append(boundary_object)
             
     def _gen_given_axis_aligned_obb(self):
         if self.axis is None:
@@ -75,7 +88,7 @@ class KRoomsCluster(KMeans, LineHelper):
         
     def _gen_estimated_grid_size(self):
         if self.grid_size is None:
-            hall_shortest_segment = self.get_shortest_segment(self.hall)
+            hall_shortest_segment = self.sorted_hall_segments[0]
             self.grid_size = hall_shortest_segment.GetLength()
         
     def _gen_grid(self):
@@ -123,7 +136,7 @@ class KRoomsCluster(KMeans, LineHelper):
                 for boundary in self.boundaries:
                     clean_up_rectangle = list(
                         rg.Curve.CreateBooleanIntersection(
-                            boundary, copied_rectangle.ToNurbsCurve()
+                            boundary.boundary, copied_rectangle.ToNurbsCurve()
                         )
                     )
                     
@@ -131,9 +144,11 @@ class KRoomsCluster(KMeans, LineHelper):
                     
                 self.grid.extend(cleanup_rectangles)
         
-    def _gen_shortest_path(self):
-        return
-
+    def _gen_grid_2(self):
+        self.initial_rectangle = self.get_2d_offset_polygon(
+            self.sorted_hall_segments[0], self.grid_size
+        )
+        
 
 if __name__ == "__main__":
     krooms = KRoomsCluster(
@@ -146,5 +161,5 @@ if __name__ == "__main__":
     
     krooms.predict()
 
-    a = krooms.grid
-    b = krooms.boundaries
+    a = krooms.initial_rectangle
+    b = [b.boundary for b in krooms.boundaries]
