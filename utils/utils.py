@@ -86,14 +86,53 @@ class LineHelper:
         return obb
         
     @staticmethod
-    def get_shortest_segment(linestring):
+    def get_sorted_segment(linestring, is_sort_by_longest=False):
+        """_description_"""
+        
         exploded_linestring = linestring.DuplicateSegments()
         sorted_linestring = sorted(
-            exploded_linestring, key=lambda l: l.GetLength()
+            exploded_linestring, 
+            key=lambda l: l.GetLength(), 
+            reverse=is_sort_by_longest
         )
-        shortest_segment = sorted_linestring[0]
         
-        return shortest_segment
+        return sorted_linestring
+        
+    @staticmethod
+    def get_2d_offset_polygon(linestring, distance):
+        """_description_"""
+        
+        if linestring.IsClosed:
+            raise Exception("Given linestring has been closed")
+        
+        offset_linestring_list = list(
+            linestring.Offset(
+                rg.Plane.WorldXY,
+                distance,
+                ConstsCollection.TOLERANCE,
+                rg.CurveOffsetCornerStyle.Sharp
+            )
+        )
+        
+        vertices = []
+        exploded_linestring = linestring.DuplicateSegments()
+        for li, each_line in enumerate(exploded_linestring):
+            vertices.append(each_line.PointAtStart)
+            if li == len(exploded_linestring) - 1:
+                vertices.append(each_line.PointAtEnd)
+        
+        offset_vertices = []
+        for offset_line in offset_linestring_list:
+            exploded_offset_linestring = offset_line.DuplicateSegments()
+            
+            for oli, each_offset_line in enumerate(exploded_offset_linestring):
+                offset_vertices.append(each_offset_line.PointAtStart)
+                if oli == len(exploded_offset_linestring) - 1:
+                    offset_vertices.append(each_offset_line.PointAtEnd)
+                
+        return rg.PolylineCurve(
+            vertices + offset_vertices[::-1] + vertices[:1]
+        )
 
 
 class NumericHelper:
