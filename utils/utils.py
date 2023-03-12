@@ -4,13 +4,15 @@ import Rhino.Display as rd
 import math
 import copy
 
-import ghpythonlib.components as gh
 
 CUSTOM_DISPLAY = "custom_display"
 
 
 class ConstsCollection:
     TOLERANCE = 0.001
+    
+    HALF = 0.5
+    INF = 1e15
 
 
 class ColorsCollection:
@@ -207,6 +209,37 @@ class PointHelper:
         return rg.Point3d(
             *[sum(coord_list) / len(points) for coord_list in zip(*points)]
         )
+        
+    @staticmethod
+    def get_projected_point_on_curve(anchor, vector, geometry):
+        """Calculate the projected point on the curve through the given point and vector
+
+        Args:
+            anchor (Rhino.Geometry.Point3d): Point to project
+            vector (Rhino.Geometry.Vector3d): Projection direction
+            geometry (Rhino.Geometry.Curve): Geometry to project 
+
+        Raises:
+            Exception: When given geometry is not curve
+
+        Returns:
+            Rhino.Geometry.Point3d: Projected point. if not intersects, return None.
+        """
+
+        if not isinstance(geometry, rg.Curve):
+            raise Exception("Unsupported geometry.")
+        
+        ray = rg.PolylineCurve([anchor, anchor + vector * ConstsCollection.INF])
+        intersection = rg.Intersect.Intersection.CurveCurve(
+            geometry, ray, ConstsCollection.TOLERANCE, ConstsCollection.TOLERANCE
+        )
+        
+        projected_point = None
+        for intersect in intersection:
+            projected_point = intersect.PointA
+            break
+        
+        return projected_point
 
 
 class VisualizeHelper:
