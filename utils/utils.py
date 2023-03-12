@@ -87,7 +87,15 @@ class LineHelper:
         
     @staticmethod
     def get_sorted_segment(linestring, is_sort_by_longest=False):
-        """_description_"""
+        """Get sorted segments based on the length of each segment
+
+        Args:
+            linestring (Rhino.Geometry.Curve): To sort curve
+            is_sort_by_longest (bool, optional): Sorting criteria. Defaults to False.
+
+        Returns:
+            List[Rhino.Geometry.Curve]: Sorted segments
+        """
         
         exploded_linestring = linestring.DuplicateSegments()
         sorted_linestring = sorted(
@@ -100,7 +108,18 @@ class LineHelper:
         
     @staticmethod
     def get_2d_offset_polygon(linestring, distance):
-        """_description_"""
+        """_summary_
+
+        Args:
+            linestring (Rhino.Geometry.Curve): Curve to make as a polygon
+            distance (float): Distance to offset
+
+        Raises:
+            Exception: When closed curve
+
+        Returns:
+            Rhino.Geometry.Curve: Offset polygon
+        """
         
         if linestring.IsClosed:
             raise Exception("Given linestring has been closed")
