@@ -1,7 +1,9 @@
 ﻿from utils.kmeans.kmeans import KMeans
-from utils.utils import LineHelper
+from utils.utils import PointHelper, LineHelper
 import Rhino.Geometry as rg
 import copy
+import math
+
 
 
 class Room:
@@ -10,8 +12,9 @@ class Room:
     """
     
     
-    def __init__(self, boundary, path):
+    def __init__(self, boundary, cells, path):
         self.boundary = boundary
+        self.cells = cells
         self.path = path
 
 
@@ -35,7 +38,7 @@ class Boundary:
         pass
 
 
-class KRoomsCluster(KMeans, LineHelper):
+class KRoomsCluster(KMeans, PointHelper, LineHelper):
     """
     To use the inherited moduels, refer the link below.
     https://github.com/PARKCHEOLHEE-lab/GhPythonUtils
@@ -53,13 +56,14 @@ class KRoomsCluster(KMeans, LineHelper):
         self.grid_size = grid_size
         
         KMeans.__init__(self)
+        PointHelper.__init__(self)
         LineHelper.__init__(self)
         
     def predict(self):
         self._gen_given_axis_aligned_obb()
         self._gen_boundaries()
         self._gen_estimated_grid_size()
-        self._gen_grid()
+#        self._gen_grid()
         self._gen_grid_2()
         
     def _gen_boundaries(self):
@@ -90,6 +94,7 @@ class KRoomsCluster(KMeans, LineHelper):
         if self.grid_size is None:
             hall_shortest_segment = self.sorted_hall_segments[0]
             self.grid_size = hall_shortest_segment.GetLength()
+            self.grid_size_x = self.sorted_hall_segments[-1].GetLength()
         
     def _gen_grid(self):
         self.x_segment, self.y_segment = self.obb.DuplicateSegments()[:2]
@@ -145,10 +150,39 @@ class KRoomsCluster(KMeans, LineHelper):
                 self.grid.extend(cleanup_rectangles)
         
     def _gen_grid_2(self):
-        self.initial_rectangle = self.get_2d_offset_polygon(
-            self.sorted_hall_segments[0], self.grid_size
+        self.base_rectangle = self.get_2d_offset_polygon(
+            self.sorted_hall_segments[0], self.grid_size_x / 2
         )
         
+        x_segment, y_segment, _, _ = self.base_rectangle.DuplicateSegments()
+        x_vector = x_segment.PointAtEnd - x_segment.PointAtStart
+        y_vector = y_segment.PointAtEnd - x_segment.PointAtStart
+        
+        anchor = self.base_rectangle.ToPolyline().CenterPoint()
+        plane = rg.Plane(anchor, x_vector, y_vector)
+        
+        counts = []
+        for plane_element in plane:
+            if isinstance(plane_element, rg.Point3d):
+                continue
+            
+            projected_points = [
+                self.get_projected_point_on_curve(
+                    anchor, plane_element, self.obb
+                ),
+                self.get_projected_point_on_curve(
+                    anchor, -plane_element, self.obb
+                )
+            ]
+            
+            for projected_point in projected_points:
+                if projected_point is None:
+                    continue
+                
+                count = int(math.ceil(projected_point.DistanceTo(anchor)))
+                counts.append(count)
+
+
 
 if __name__ == "__main__":
     krooms = KRoomsCluster(
@@ -161,5 +195,6 @@ if __name__ == "__main__":
     
     krooms.predict()
 
-    a = krooms.initial_rectangle
+    a = krooms.base_rectangle
     b = [b.boundary for b in krooms.boundaries]
+#    c = krooms.projected_points
