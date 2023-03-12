@@ -110,7 +110,7 @@ class LineHelper:
         
     @staticmethod
     def get_2d_offset_polygon(linestring, distance):
-        """_summary_
+        """Create a polygon through the given opened curve
 
         Args:
             linestring (Rhino.Geometry.Curve): Curve to make as a polygon
