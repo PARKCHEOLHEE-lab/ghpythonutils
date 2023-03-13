@@ -1,5 +1,5 @@
 ﻿from utils.kmeans.kmeans import KMeans
-from utils.utils import PointHelper, LineHelper
+from utils.utils import PointHelper, LineHelper, ConstsCollection
 import Rhino.Geometry as rg
 import copy
 import math
@@ -38,7 +38,7 @@ class Boundary:
         pass
 
 
-class KRoomsCluster(KMeans, PointHelper, LineHelper):
+class KRoomsCluster(KMeans, PointHelper, LineHelper, ConstsCollection):
     """
     To use the inherited moduels, refer the link below.
     https://github.com/PARKCHEOLHEE-lab/GhPythonUtils
@@ -58,13 +58,13 @@ class KRoomsCluster(KMeans, PointHelper, LineHelper):
         KMeans.__init__(self)
         PointHelper.__init__(self)
         LineHelper.__init__(self)
+        ConstsCollection.__init__(self)
         
     def predict(self):
         self._gen_given_axis_aligned_obb()
         self._gen_boundaries()
         self._gen_estimated_grid_size()
-#        self._gen_grid()
-        self._gen_grid_2()
+        self._gen_grid()
         
     def _gen_boundaries(self):
         boundaries = rg.Curve.CreateBooleanDifference(
@@ -78,7 +78,7 @@ class KRoomsCluster(KMeans, PointHelper, LineHelper):
             
     def _gen_given_axis_aligned_obb(self):
         if self.axis is None:
-            self.axis = self.hall.DuplicateSegments()[0]
+            self.axis = self.core.DuplicateSegments()[0]
             
         self.obb = self.get_2d_obb_from_line(
             self.axis, self.floor
@@ -97,74 +97,33 @@ class KRoomsCluster(KMeans, PointHelper, LineHelper):
             self.grid_size_x = self.sorted_hall_segments[-1].GetLength()
         
     def _gen_grid(self):
-        self.x_segment, self.y_segment = self.obb.DuplicateSegments()[:2]
-        
-        x_segment_divided_length = self.x_segment.DivideByLength(
-            self.grid_size, includeEnds=True
+        base_rectangle = self.get_2d_offset_polygon(
+            self.sorted_hall_segments[0], self.grid_size_x / 4
         )
         
-        y_count = int(self.y_segment.GetLength() / self.grid_size) + 1
-        y_vector = (
-            self.y_segment.PointAtLength(self.grid_size) 
-            - self.y_segment.PointAtStart
+        base_rectangle.Translate(
+            (
+                self.sorted_hall_segments[0].PointAtStart 
+                - self.sorted_hall_segments[0].PointAtEnd
+            ) / 2
         )
         
-        self.grid = []
-        for xi, x_length in enumerate(x_segment_divided_length):
-            next_xi = (xi + 1) % len(x_segment_divided_length)
-            next_x_length = x_segment_divided_length[next_xi]
-            
-            start_point = self.x_segment.PointAt(x_length)
-            next_point = self.x_segment.PointAt(next_x_length)
-            
-            if xi == len(x_segment_divided_length) - 1:
-                next_point = self.x_segment.PointAtEnd
-                
-            offset_start_point = start_point + y_vector
-            offset_next_point = next_point + y_vector
-                
-            rectangle = rg.PolylineCurve(
-                [
-                    start_point, 
-                    next_point, 
-                    offset_next_point, 
-                    offset_start_point, 
-                    start_point
-                ]
-            )
-            
-            for y in range(y_count):
-                copied_rectangle = copy.copy(rectangle)
-                copied_rectangle.Translate(y_vector * y)
-                
-                cleanup_rectangles = []
-                for boundary in self.boundaries:
-                    clean_up_rectangle = list(
-                        rg.Curve.CreateBooleanIntersection(
-                            boundary.boundary, copied_rectangle.ToNurbsCurve()
-                        )
-                    )
-                    
-                    cleanup_rectangles.extend(clean_up_rectangle)
-                    
-                self.grid.extend(cleanup_rectangles)
-        
-    def _gen_grid_2(self):
-        self.base_rectangle = self.get_2d_offset_polygon(
-            self.sorted_hall_segments[0], self.grid_size_x / 2
+        x_segment, y_segment, _, _ = base_rectangle.DuplicateSegments()
+        anchor = base_rectangle.ToPolyline().CenterPoint()
+        plane = rg.Plane(
+            origin=anchor, 
+            xDirection=x_segment.PointAtEnd - x_segment.PointAtStart, 
+            yDirection=y_segment.PointAtEnd - x_segment.PointAtStart
         )
-        
-        x_segment, y_segment, _, _ = self.base_rectangle.DuplicateSegments()
-        x_vector = x_segment.PointAtEnd - x_segment.PointAtStart
-        y_vector = y_segment.PointAtEnd - x_segment.PointAtStart
-        
-        anchor = self.base_rectangle.ToPolyline().CenterPoint()
-        plane = rg.Plane(anchor, x_vector, y_vector)
         
         counts = []
-        for plane_element in plane:
+        for vi, plane_element in enumerate(plane):
             if isinstance(plane_element, rg.Point3d):
                 continue
+            
+            grid_size = x_segment.GetLength()
+            if vi == 2:
+                grid_size = y_segment.GetLength()
             
             projected_points = [
                 self.get_projected_point_on_curve(
@@ -179,9 +138,42 @@ class KRoomsCluster(KMeans, PointHelper, LineHelper):
                 if projected_point is None:
                     continue
                 
-                count = int(math.ceil(projected_point.DistanceTo(anchor)))
+                count = int(
+                    math.ceil(projected_point.DistanceTo(anchor) / grid_size)
+                ) + 1
+                
                 counts.append(count)
-
+        
+        x_vectors = [plane.XAxis, -plane.XAxis]
+        y_vectors = [plane.YAxis, -plane.YAxis]
+        
+        x_grid = [base_rectangle]
+        for x_count, x_vector in zip(counts[:2], x_vectors):
+            for xc in range(1, x_count):
+                copied_rectangle = copy.copy(base_rectangle)
+                vector = x_vector * x_segment.GetLength() * xc
+                copied_rectangle.Translate(vector)
+                x_grid.append(copied_rectangle)
+                
+        all_grid = [] + x_grid
+        for rectangle in x_grid:
+            for y_count, y_vector in zip(counts[2:], y_vectors):
+                for yc in range(y_count):
+                    copied_rectangle = copy.copy(rectangle)
+                    vector = y_vector * y_segment.GetLength() * yc
+                    copied_rectangle.Translate(vector)
+                    all_grid.append(copied_rectangle)
+        
+        self.grid = []
+        for grid in all_grid:
+            for boundary in self.boundaries:
+                tidied_grid = list(
+                    rg.Curve.CreateBooleanIntersection(
+                        boundary.boundary, grid, self.TOLERANCE
+                    )
+                )
+                
+                self.grid.extend(tidied_grid)
 
 
 if __name__ == "__main__":
@@ -195,6 +187,7 @@ if __name__ == "__main__":
     
     krooms.predict()
 
-    a = krooms.base_rectangle
+    a = krooms.grid
     b = [b.boundary for b in krooms.boundaries]
-#    c = krooms.projected_points
+#    c = krooms.a
+#    print(c)
