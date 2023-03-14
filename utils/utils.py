@@ -109,12 +109,14 @@ class LineHelper:
         return sorted_linestring
         
     @staticmethod
-    def get_2d_offset_polygon(linestring, distance):
+    def get_2d_offset_polygon(linestring, distance, plane=rg.Plane.WorldXY):
         """Create a polygon through the given opened curve
 
         Args:
             linestring (Rhino.Geometry.Curve): Curve to make as a polygon
             distance (float): Distance to offset
+            plane (Rhino.Geometry.Plane, optional): Offset plane
+                                                    Defaults to WorldXY
 
         Raises:
             Exception: When closed curve
@@ -128,7 +130,7 @@ class LineHelper:
         
         offset_linestring_list = list(
             linestring.Offset(
-                rg.Plane.WorldXY,
+                plane,
                 distance,
                 ConstsCollection.TOLERANCE,
                 rg.CurveOffsetCornerStyle.Sharp
@@ -154,6 +156,38 @@ class LineHelper:
         return rg.PolylineCurve(
             vertices + offset_vertices[::-1] + vertices[:1]
         )
+        
+    @staticmethod
+    def get_2d_buffered_linestring(linestring, distance):
+        """Create a linestring has width 
+
+        Args:
+            linestring (Rhino.Geometry.Curve): Target curve
+            distance (float): Width
+
+        Returns:
+            List[Rhino.Geometry.Curve]: Buffered linestring
+        """
+
+        _, section_plane = linestring.FrameAt(0)
+        vector_1 = section_plane.YAxis * distance / 2
+        vector_2 = -section_plane.YAxis * distance / 2
+        section = rg.Line(
+            linestring.PointAtStart + vector_1,
+            linestring.PointAtStart + vector_2
+        ).ToNurbsCurve()
+        
+        buffered_linestring = rg.Brep.CreateFromSweep(
+            linestring, section, True, ConstsCollection.TOLERANCE
+        )
+        
+        buffered_linestring_outer = []
+        for line in buffered_linestring:
+            buffered_linestring_outer.extend(
+                list(line.DuplicateNakedEdgeCurves(True, False))
+            )
+        
+        return list(rg.Curve.JoinCurves(buffered_linestring_outer))
 
 
 class NumericHelper:
