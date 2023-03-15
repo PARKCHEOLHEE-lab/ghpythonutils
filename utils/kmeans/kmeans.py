@@ -23,7 +23,7 @@ class KMeans(PointHelper):
         
         import random
         self.random = random
-        self.random.seed = random_seed
+        self.random.seed(random_seed)
         
     def predict(self, get_indices=False):
         """Classify given points by input k
@@ -127,6 +127,9 @@ class KMeans(PointHelper):
             
             shift_distance = 0.0
             for ci, current_centroid in enumerate(centroids):
+                if len(clusters[ci]) == 0:
+                    continue
+                
                 updated_centroid = self.get_centroid(clusters[ci])
                 shift_distance = max(updated_centroid.DistanceTo(current_centroid), shift_distance)
                 

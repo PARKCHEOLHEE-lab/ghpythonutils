@@ -3,7 +3,7 @@ from utils.utils import PointHelper, LineHelper, ConstsCollection
 import Rhino.Geometry as rg
 import copy
 import math
-
+from ghpythonlib.components import ShortestWalk
 
 
 class Room:
@@ -11,11 +11,13 @@ class Room:
     _description_
     """
     
-    
     def __init__(self, boundary, cells, path):
         self.boundary = boundary
         self.cells = cells
         self.path = path
+        
+    def _gen_corridor(self):
+        pass
 
 
 class Boundary:
@@ -33,9 +35,6 @@ class Boundary:
     def _gen_estimated_k(self):
         """The K is given floor area divided target area."""
         self.k = int(self.boundary_area / self.target_area)
-        
-    def _gen_shortest_path(self):
-        pass
 
 
 class KRoomsCluster(KMeans, PointHelper, LineHelper, ConstsCollection):
@@ -45,7 +44,7 @@ class KRoomsCluster(KMeans, PointHelper, LineHelper, ConstsCollection):
     """
     
     def __init__(
-        self, floor, core, hall, target_area, axis=None, grid_size=None
+        self, floor, core, hall, target_area, axis=None
     ):
         self.floor = floor
         self.core = core
@@ -53,18 +52,23 @@ class KRoomsCluster(KMeans, PointHelper, LineHelper, ConstsCollection):
         self.sorted_hall_segments = self.get_sorted_segment(self.hall)
         self.target_area = target_area
         self.axis = axis
-        self.grid_size = grid_size
         
         KMeans.__init__(self)
         PointHelper.__init__(self)
         LineHelper.__init__(self)
         ConstsCollection.__init__(self)
         
-    def predict(self):
+        
+    def get_predicted_rooms(self):
         self._gen_given_axis_aligned_obb()
         self._gen_boundaries()
         self._gen_estimated_grid_size()
         self._gen_grid()
+        self._gen_predicted_rooms()
+        self._gen_network()
+        self._gen_connected_rooms_to_corridor()
+        
+        return self.rooms
         
     def _gen_boundaries(self):
         boundaries = rg.Curve.CreateBooleanDifference(
@@ -91,10 +95,9 @@ class KRoomsCluster(KMeans, PointHelper, LineHelper, ConstsCollection):
            self.obb.Reverse()
         
     def _gen_estimated_grid_size(self):
-        if self.grid_size is None:
-            hall_shortest_segment = self.sorted_hall_segments[0]
-            self.grid_size = hall_shortest_segment.GetLength()
-            self.grid_size_x = self.sorted_hall_segments[-1].GetLength()
+        hall_shortest_segment = self.sorted_hall_segments[0]
+        self.grid_size = hall_shortest_segment.GetLength()
+        self.grid_size_x = self.sorted_hall_segments[-1].GetLength()
         
     def _gen_grid(self):
         base_rectangle = self.get_2d_offset_polygon(
@@ -174,6 +177,72 @@ class KRoomsCluster(KMeans, PointHelper, LineHelper, ConstsCollection):
                 )
                 
                 self.grid.extend(tidied_grid)
+        
+        self.grid_centroids = [
+            rg.AreaMassProperties.Compute(g).Centroid for g in self.grid
+        ]
+    
+    def _gen_predicted_rooms(self):
+        self.points = self.grid_centroids
+        self.k = self.boundaries[0].k
+        
+        _, indices = self.predict(get_indices=True)
+        
+        self.rooms = []
+        for each_indices in indices:
+            room = []
+            for index in each_indices:
+                room.append(self.grid[index])
+                
+            self.rooms.extend(rg.Curve.CreateBooleanUnion(room))
+    
+    def _gen_network(self):
+        self.network = []
+        self.network_length = []
+        for room in self.rooms:
+            for segment in room.DuplicateSegments():
+                self.network.append(segment)
+                self.network_length.append(segment.GetLength())
+        
+        start_point_candidates = []
+        for grid in self.grid:
+            intersections = rg.Intersect.Intersection.CurveCurve(
+                grid, self.hall, self.TOLERANCE, self.TOLERANCE
+            )
+            
+            for intsc in intersections:
+                rg.Intersect.IntersectionEvent.PointA2
+                start_point_candidates.append(intsc.PointA)
+                start_point_candidates.append(intsc.PointA2)
+        
+        start_point_candidates = list(
+            rg.Point3d.CullDuplicates(
+                start_point_candidates, self.TOLERANCE
+            )
+        )
+        
+        hall_vertices = [s.PointAtStart for s in self.hall.DuplicateSegments()]
+        corner_circles = []
+        for hall_vertex in hall_vertices:
+            corner_circle = rg.Circle(
+                hall_vertex, self.sorted_hall_segments[0].GetLength() / 3
+            ).ToNurbsCurve()
+            
+            corner_circles.append(corner_circle)
+        
+        self.start_points = []
+        for candidate in start_point_candidates:
+            outside_count = 0
+            for circle in corner_circles:
+                outside_count += int(
+                    circle.Contains(candidate) == rg.PointContainment.Outside
+                )
+            if outside_count == len(hall_vertices):
+                self.start_points.append(candidate)
+
+    def _gen_connected_rooms_to_corridor(self):
+        return
+
 
 
 if __name__ == "__main__":
@@ -181,13 +250,10 @@ if __name__ == "__main__":
         floor=floor,
         core=core,
         hall=hall,
-        target_area=40,
-        grid_size=None
+        target_area=70,
     )
     
-    krooms.predict()
-
+    c = krooms.get_predicted_rooms()
     a = krooms.grid
-    b = [b.boundary for b in krooms.boundaries]
-#    c = krooms.a
-#    print(c)
+    b = krooms.rooms
+    d = krooms.start_points
