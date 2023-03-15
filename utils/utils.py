@@ -1,5 +1,4 @@
-﻿import rhinoscriptsyntax as rs
-import Rhino.Geometry as rg
+﻿import Rhino.Geometry as rg
 import Rhino.Display as rd
 import math
 import copy
