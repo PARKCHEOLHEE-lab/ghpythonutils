@@ -187,6 +187,38 @@ class LineHelper:
             )
         
         return list(rg.Curve.JoinCurves(buffered_linestring_outer))
+        
+    @staticmethod
+    def get_curve_vertices(linestring):
+        """ Get vertices from given linestring
+
+        Args:
+            linestring (Rhino.Geometry.Curve): Given curve
+
+        Returns:
+            List[Rhino.Geometry.Point3d]: Vertices to curve
+        """
+        
+        vertices = []
+        exploded_linestring = linestring.DuplicateSegments()
+        is_closed = linestring.IsClosed
+        
+        if len(exploded_linestring) == 1:
+            vertices.extend(
+                [
+                    exploded_linestring[0].PointAtStart, 
+                    exploded_linestring[0].PointAtEnd
+                ]
+            )
+            
+        else:
+            for li, line in enumerate(exploded_linestring):
+                vertices.append(line.PointAtStart)
+                
+                if li == len(exploded_linestring) - 1 and not is_closed:
+                    vertices.append(line.PointAtEnd)
+        
+        return vertices
 
 
 class NumericHelper:
@@ -204,7 +236,23 @@ class NumericHelper:
         """
         
         return abs(n1 - n2) <= tolerance
+        
+    @staticmethod
+    def all_close(nums, target, tolerance=ConstsCollection.TOLERANCE):
+        """Check whether all numbers are the same as the target
 
+        Args:
+            nums (List[float]): Numbers to compare
+            target (float): Target number to compare 
+            tolerance (float, optional): Permissible range. Defaults to ConstsCollection.TOLERANCE.
+
+        Returns:
+            bool: Compare result about whether all numbers are equal
+        """
+        
+        return all(
+           NumericHelper.is_close(num, target, tolerance) for num in nums
+        )
 
 class SurfaceHelper:
     @staticmethod
