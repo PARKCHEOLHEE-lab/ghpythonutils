@@ -1,3 +1,1 @@
-__all__ = [
-    "KMeans"
-]
+__all__ = ["KMeans"]

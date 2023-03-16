@@ -9,7 +9,7 @@ CUSTOM_DISPLAY = "custom_display"
 
 class ConstsCollection:
     TOLERANCE = 0.001
-    
+
     HALF = 0.5
     INF = 1e15
 
@@ -30,11 +30,11 @@ class Enum:
         Returns:
             Enum: custom enumerated type
         """
-        
+
         enums = {}
         for ni, name in enumerate(names):
             enums[name] = ni
-            
+
         return type("Enum", (), enums)
 
 
@@ -50,19 +50,19 @@ class LineHelper:
         Returns:
             float: Angle of given linestring
         """
-                
+
         x1, y1, _ = linestring.PointAtStart
         x2, y2, _ = linestring.PointAtEnd
-        
+
         angle = math.atan2(y2 - y1, x2 - x1)
         if is_radians:
             return angle
-        
+
         return math.degrees(angle)
-    
+
     @staticmethod
     def get_2d_obb_from_line(linestring, geom):
-        """Create an oriented bounding box by given axis of linestring 
+        """Create an oriented bounding box by given axis of linestring
 
         Args:
             linestring (Rhino.Geometry.Curve): Alignment axis
@@ -73,19 +73,19 @@ class LineHelper:
         """
         angle = LineHelper.get_line_2d_angle(linestring)
         anchor = geom.ToPolyline().CenterPoint()
-        
+
         negative_transform = rg.Transform.Rotation(-angle, anchor)
         positive_transform = rg.Transform.Rotation(angle, anchor)
-        
+
         copied_geom = copy.copy(geom)
         copied_geom.Transform(negative_transform)
-        
+
         obb = copied_geom.GetBoundingBox(rg.Plane.WorldXY)
         obb = rg.Rectangle3d(rg.Plane.WorldXY, obb.Min, obb.Max)
         obb.Transform(positive_transform)
-        
+
         return obb
-        
+
     @staticmethod
     def get_sorted_segment(linestring, is_sort_by_longest=False):
         """Get sorted segments based on the length of each segment
@@ -97,16 +97,16 @@ class LineHelper:
         Returns:
             List[Rhino.Geometry.Curve]: Sorted segments
         """
-        
+
         exploded_linestring = linestring.DuplicateSegments()
         sorted_linestring = sorted(
-            exploded_linestring, 
-            key=lambda l: l.GetLength(), 
-            reverse=is_sort_by_longest
+            exploded_linestring,
+            key=lambda l: l.GetLength(),
+            reverse=is_sort_by_longest,
         )
-        
+
         return sorted_linestring
-        
+
     @staticmethod
     def get_2d_offset_polygon(linestring, distance, plane=rg.Plane.WorldXY):
         """Create a polygon through the given opened curve
@@ -123,42 +123,40 @@ class LineHelper:
         Returns:
             Rhino.Geometry.Curve: Offset polygon
         """
-        
+
         if linestring.IsClosed:
             raise Exception("Given linestring has been closed")
-        
+
         offset_linestring_list = list(
             linestring.Offset(
                 plane,
                 distance,
                 ConstsCollection.TOLERANCE,
-                rg.CurveOffsetCornerStyle.Sharp
+                rg.CurveOffsetCornerStyle.Sharp,
             )
         )
-        
+
         vertices = []
         exploded_linestring = linestring.DuplicateSegments()
         for li, each_line in enumerate(exploded_linestring):
             vertices.append(each_line.PointAtStart)
             if li == len(exploded_linestring) - 1:
                 vertices.append(each_line.PointAtEnd)
-        
+
         offset_vertices = []
         for offset_line in offset_linestring_list:
             exploded_offset_linestring = offset_line.DuplicateSegments()
-            
+
             for oli, each_offset_line in enumerate(exploded_offset_linestring):
                 offset_vertices.append(each_offset_line.PointAtStart)
                 if oli == len(exploded_offset_linestring) - 1:
                     offset_vertices.append(each_offset_line.PointAtEnd)
-                
-        return rg.PolylineCurve(
-            vertices + offset_vertices[::-1] + vertices[:1]
-        )
-        
+
+        return rg.PolylineCurve(vertices + offset_vertices[::-1] + vertices[:1])
+
     @staticmethod
     def get_2d_buffered_linestring(linestring, distance):
-        """Create a linestring has width 
+        """Create a linestring has width
 
         Args:
             linestring (Rhino.Geometry.Curve): Target curve
@@ -173,24 +171,24 @@ class LineHelper:
         vector_2 = -section_plane.YAxis * distance / 2
         section = rg.Line(
             linestring.PointAtStart + vector_1,
-            linestring.PointAtStart + vector_2
+            linestring.PointAtStart + vector_2,
         ).ToNurbsCurve()
-        
+
         buffered_linestring = rg.Brep.CreateFromSweep(
             linestring, section, True, ConstsCollection.TOLERANCE
         )
-        
+
         buffered_linestring_outer = []
         for line in buffered_linestring:
             buffered_linestring_outer.extend(
                 list(line.DuplicateNakedEdgeCurves(True, False))
             )
-        
+
         return list(rg.Curve.JoinCurves(buffered_linestring_outer))
-        
+
     @staticmethod
     def get_curve_vertices(linestring):
-        """ Get vertices from given linestring
+        """Get vertices from given linestring
 
         Args:
             linestring (Rhino.Geometry.Curve): Given curve
@@ -198,26 +196,26 @@ class LineHelper:
         Returns:
             List[Rhino.Geometry.Point3d]: Vertices to curve
         """
-        
+
         vertices = []
         exploded_linestring = linestring.DuplicateSegments()
         is_closed = linestring.IsClosed
-        
+
         if len(exploded_linestring) == 1:
             vertices.extend(
                 [
-                    exploded_linestring[0].PointAtStart, 
-                    exploded_linestring[0].PointAtEnd
+                    exploded_linestring[0].PointAtStart,
+                    exploded_linestring[0].PointAtEnd,
                 ]
             )
-            
+
         else:
             for li, line in enumerate(exploded_linestring):
                 vertices.append(line.PointAtStart)
-                
+
                 if li == len(exploded_linestring) - 1 and not is_closed:
                     vertices.append(line.PointAtEnd)
-        
+
         return vertices
 
 
@@ -227,32 +225,33 @@ class NumericHelper:
         """Check if two numbers are within margin of error
 
         Args:
-            n1 (float): Number to compare 
+            n1 (float): Number to compare
             n2 (float): Number to compare
             tolerance (float, optional): Permissible range. Defaults to ConstsCollection.TOLERANCE.
 
         Returns:
             bool: Compare result about whether two numbers are equal
         """
-        
+
         return abs(n1 - n2) <= tolerance
-        
+
     @staticmethod
     def all_close(nums, target, tolerance=ConstsCollection.TOLERANCE):
         """Check whether all numbers are the same as the target
 
         Args:
             nums (List[float]): Numbers to compare
-            target (float): Target number to compare 
+            target (float): Target number to compare
             tolerance (float, optional): Permissible range. Defaults to ConstsCollection.TOLERANCE.
 
         Returns:
             bool: Compare result about whether all numbers are equal
         """
-        
+
         return all(
-           NumericHelper.is_close(num, target, tolerance) for num in nums
+            NumericHelper.is_close(num, target, tolerance) for num in nums
         )
+
 
 class SurfaceHelper:
     @staticmethod
@@ -265,13 +264,13 @@ class SurfaceHelper:
         Returns:
             Rhino.Geometry.Surface: Reparameterized surface
         """
-        
+
         interval = rg.Interval(0, 1)
-        
+
         copied_srf = copy.copy(srf)
         copied_srf.SetDomain(0, interval)
         copied_srf.SetDomain(1, interval)
-        
+
         return copied_srf
 
 
@@ -284,13 +283,13 @@ class PointHelper:
             points (List[Rhino.Geometry.Point3d]): Points cloud
 
         Returns:
-            Rhino.Geometry.Point3d: Centroid of points cloud 
+            Rhino.Geometry.Point3d: Centroid of points cloud
         """
-        
+
         return rg.Point3d(
             *[sum(coord_list) / len(points) for coord_list in zip(*points)]
         )
-        
+
     @staticmethod
     def get_projected_point_on_curve(anchor, vector, geometry):
         """Calculate the projected point on the curve through the given point and vector
@@ -298,7 +297,7 @@ class PointHelper:
         Args:
             anchor (Rhino.Geometry.Point3d): Point to project
             vector (Rhino.Geometry.Vector3d): Projection direction
-            geometry (Rhino.Geometry.Curve): Geometry to project 
+            geometry (Rhino.Geometry.Curve): Geometry to project
 
         Raises:
             Exception: When given geometry is not curve
@@ -309,17 +308,20 @@ class PointHelper:
 
         if not isinstance(geometry, rg.Curve):
             raise Exception("Unsupported geometry.")
-        
+
         ray = rg.PolylineCurve([anchor, anchor + vector * ConstsCollection.INF])
         intersection = rg.Intersect.Intersection.CurveCurve(
-            geometry, ray, ConstsCollection.TOLERANCE, ConstsCollection.TOLERANCE
+            geometry,
+            ray,
+            ConstsCollection.TOLERANCE,
+            ConstsCollection.TOLERANCE,
         )
-        
+
         projected_point = None
         for intersect in intersection:
             projected_point = intersect.PointA
             break
-        
+
         return projected_point
 
 
@@ -327,26 +329,26 @@ class VisualizeHelper:
     """
     NOTE: If you RUN(F5) in ghpython scripting window, the text may not remove.
     """
-    
+
     @classmethod
     def __initialize(cls):
         if CUSTOM_DISPLAY not in globals():
             globals()[CUSTOM_DISPLAY] = rd.CustomDisplay(True)
-    
+
     @classmethod
     def __dispose(cls):
         globals()[CUSTOM_DISPLAY].Dispose()
         del globals()[CUSTOM_DISPLAY]
-    
+
     @staticmethod
     def visualize_text(
-        string, 
-        height, 
-        toggle, 
+        string,
+        height,
+        toggle,
         color=ColorsCollection.COLOR_BLACK,
-        string_place_origin=rg.Point3d(0, 0, 0), 
-        string_place_plane=rg.Plane.WorldXY
-    ):  
+        string_place_origin=rg.Point3d(0, 0, 0),
+        string_place_plane=rg.Plane.WorldXY,
+    ):
         """Text visualization helper
 
         Args:
@@ -357,7 +359,7 @@ class VisualizeHelper:
             string_place_origin (Rhino.Geometry.Point3d, optional): Location of text. Defaults to rg.Point3d(0, 0, 0).
             string_place_plane (Rhino.Geometry.Plane, optional): Text direction. Defaults to rg.Plane.WorldXY.
         """
-        
+
         VisualizeHelper.__initialize()
         if not toggle:
             VisualizeHelper.__dispose()
@@ -365,7 +367,7 @@ class VisualizeHelper:
             string_place_plane.Origin = string_place_origin
             text_3d = rd.Text3d(string, string_place_plane, height)
             globals()[CUSTOM_DISPLAY].AddText(text_3d, color)
-    
+
     @staticmethod
     def visualize_curve(
         curve, toggle, color=ColorsCollection.COLOR_BLACK, thickness=1
@@ -378,19 +380,19 @@ class VisualizeHelper:
             color (Rhino.Display.ColorHSL, optional): Curve color. Defaults to ColorHelper.COLOR_BLACK.
             thickness (int, optional): Curve display thickness. Defaults to 1.
         """
-        
+
         VisualizeHelper.__initialize()
         if not toggle:
             VisualizeHelper.__dispose()
         else:
             globals()[CUSTOM_DISPLAY].AddCurve(curve, color, thickness)
-    
+
     @staticmethod
     def visualize_polygon(
-        polygon, 
+        polygon,
         toggle,
-        fill_color=ColorsCollection.COLOR_GRAY, 
-        edge_color=ColorsCollection.COLOR_BLACK, 
+        fill_color=ColorsCollection.COLOR_GRAY,
+        edge_color=ColorsCollection.COLOR_BLACK,
         draw_fill=True,
         draw_edge=True,
     ):
@@ -403,7 +405,7 @@ class VisualizeHelper:
             edge_color (Rhino.Display.ColorHSL, optional): Polygon's edge color. Defaults to ColorHelper.COLOR_BLACK.
             draw_fill (bool, optional): Whether polygon inside fill. Defaults to True.
             draw_edge (bool, optional): Whether polygon edge visualization. Defaults to True.
-            
+
         NOTE:
             This function is incomplete. Sometimes the concave part of the polygon is convexly filled
         """
