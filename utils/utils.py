@@ -155,7 +155,7 @@ class LineHelper:
         return rg.PolylineCurve(vertices + offset_vertices[::-1] + vertices[:1])
 
     @staticmethod
-    def get_2d_buffered_linestring(linestring, distance):
+    def get_2d_buffered_linestring(linestring, distance, is_single_side=False):
         """Create a linestring has width
 
         Args:
@@ -166,16 +166,40 @@ class LineHelper:
             List[Rhino.Geometry.Curve]: Buffered linestring
         """
 
-        _, section_plane = linestring.FrameAt(0)
+        linestring = linestring.Simplify(
+            rg.CurveSimplifyOptions.Merge,
+            ConstsCollection.TOLERANCE,
+            ConstsCollection.TOLERANCE,
+        )
+
+        exploded_linestring = linestring.DuplicateSegments()
+        first_line = exploded_linestring[0]
+
+        is_plane_creation_succeed, section_plane = first_line.FrameAt(0)
+        if not is_plane_creation_succeed:
+            angle = LineHelper.get_line_2d_angle(first_line)
+            transform = rg.Transform.Rotation(angle, section_plane.Origin)
+
+            section_plane.Transform(transform)
+            section_plane.Origin = first_line.PointAtStart
+
         vector_1 = section_plane.YAxis * distance / 2
         vector_2 = -section_plane.YAxis * distance / 2
+
+        if is_single_side:
+            vector_1 = section_plane.YAxis * distance
+            vector_2 = -section_plane.YAxis * 0
+
         section = rg.Line(
             linestring.PointAtStart + vector_1,
             linestring.PointAtStart + vector_2,
         ).ToNurbsCurve()
 
         buffered_linestring = rg.Brep.CreateFromSweep(
-            linestring, section, True, ConstsCollection.TOLERANCE
+            rail=linestring,
+            shape=section,
+            closed=True,
+            tolerance=ConstsCollection.TOLERANCE,
         )
 
         buffered_linestring_outer = []
