@@ -1,3 +1,1 @@
-﻿__all__ = [
-    "MinMaxScaler"
-]
+﻿__all__ = ["MinMaxScaler"]
