@@ -65,7 +65,7 @@ class KRoomsCluster(KMeans, PointHelper, LineHelper, ConstsCollection):
         self._gen_network()
         self._gen_connected_rooms_to_corridor()
 
-        return self.rooms
+        return self.krooms
 
     def _gen_boundaries(self):
         boundaries = rg.Curve.CreateBooleanDifference(self.floor, self.core)
@@ -96,16 +96,15 @@ class KRoomsCluster(KMeans, PointHelper, LineHelper, ConstsCollection):
 
     def _gen_grid(self):
         base_rectangle = self.get_2d_offset_polygon(
-            self.sorted_hall_segments[0], self.grid_size_x / 4
+            self.sorted_hall_segments[0], self.grid_size_x / 5
         )
 
-        base_rectangle.Translate(
-            (
-                self.sorted_hall_segments[0].PointAtStart
-                - self.sorted_hall_segments[0].PointAtEnd
-            )
-            / 2
-        )
+        #        base_rectangle.Translate(
+        #            (
+        #                self.sorted_hall_segments[0].PointAtStart
+        #                - self.sorted_hall_segments[0].PointAtEnd
+        #            ) / 2
+        #        )
 
         x_segment, y_segment, _, _ = base_rectangle.DuplicateSegments()
         anchor = base_rectangle.ToPolyline().CenterPoint()
@@ -216,7 +215,7 @@ class KRoomsCluster(KMeans, PointHelper, LineHelper, ConstsCollection):
                 start_point_candidates.append(intsc.PointA)
                 start_point_candidates.append(intsc.PointA2)
 
-        start_point_candidates = list(
+        self.start_point_candidates = list(
             rg.Point3d.CullDuplicates(start_point_candidates, self.TOLERANCE)
         )
 
@@ -229,29 +228,77 @@ class KRoomsCluster(KMeans, PointHelper, LineHelper, ConstsCollection):
 
             corner_circles.append(corner_circle)
 
-        self.start_points = []
-        for candidate in start_point_candidates:
-            outside_count = 0
-            for circle in corner_circles:
-                outside_count += int(
-                    circle.Contains(candidate) == rg.PointContainment.Outside
-                )
-            if outside_count == len(hall_vertices):
-                self.start_points.append(candidate)
-
     def _gen_connected_rooms_to_corridor(self):
-        return
+        self.inaccessible_rooms = []
+        for ri, room in enumerate(self.rooms):
+            intersections = rg.Intersect.Intersection.CurveCurve(
+                room, self.hall, self.TOLERANCE, self.TOLERANCE
+            )
+
+            is_accessible = len(intersections) > 0
+            if not is_accessible:
+                self.inaccessible_rooms.append(room)
+
+        hall_centroid = rg.AreaMassProperties.Compute(self.hall).Centroid
+        sorted_inaccessible_rooms = sorted(
+            self.inaccessible_rooms,
+            key=lambda r: rg.AreaMassProperties.Compute(r).Centroid.DistanceTo(
+                hall_centroid
+            ),
+            reverse=True,
+        )
+
+        self.corridor = []
+        for inaccessible_room in sorted_inaccessible_rooms:
+            ic = rg.AreaMassProperties.Compute(inaccessible_room).Centroid
+            start_point = sorted(
+                self.start_point_candidates, key=lambda p: p.DistanceTo(ic)
+            )[0]
+
+            _, start, end = inaccessible_room.ClosestPoints(self.hall)
+
+            corridor_curve, _, _, _ = ShortestWalk.ShortestWalk(
+                self.network,
+                self.network_length,
+                rg.Line(start, end).ToNurbsCurve(),
+            )
+
+            extended_corridor = corridor_curve.Extend(
+                rg.CurveEnd.Both, 1.4, rg.CurveExtensionStyle.Line
+            )
+
+            corridor = self.get_2d_buffered_linestring(
+                extended_corridor, -1.4, True
+            )[0]
+
+            intscs = rg.Curve.CreateBooleanIntersection(self.hall, corridor)
+            if len(intscs) != 0:
+                corridor = self.get_2d_buffered_linestring(
+                    extended_corridor, 1.4, True
+                )[0]
+
+            self.corridor.append(corridor)
+
+        self.corridor = rg.Curve.CreateBooleanUnion(
+            self.corridor + [self.hall]
+        )[0]
+
+        self.krooms = []
+        for room in self.rooms:
+            self.krooms.extend(
+                list(rg.Curve.CreateBooleanDifference(room, self.corridor))
+            )
 
 
 if __name__ == "__main__":
-    krooms = KRoomsCluster(
+    krsc = KRoomsCluster(
         floor=floor,
         core=core,
         hall=hall,
-        target_area=70,
+        target_area=50,
     )
 
-    c = krooms.get_predicted_rooms()
-    a = krooms.grid
-    b = krooms.rooms
-    d = krooms.start_points
+    krooms = krsc.get_predicted_rooms()
+    grid = krsc.grid
+    e = krsc.corridor
+    f = krsc.inaccessible_rooms
