@@ -1,7 +1,7 @@
 ﻿import Rhino.Geometry as rg
 import Rhino.Display as rd
-from utils.scaler.minmaxscaler import MinMaxScaler
-from utils.utils import NumericHelper, VisualizeHelper, ColorsCollection
+from ghpythonutils.utils.scaler.minmaxscaler import MinMaxScaler
+from ghpythonutils.utils.utils import NumericHelper, VisualizeHelper, ColorsCollection
 
 
 class ScorePolygon(

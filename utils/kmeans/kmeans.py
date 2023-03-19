@@ -1,6 +1,6 @@
 ﻿import Rhino.Geometry as rg
 
-from utils.utils import PointHelper
+from ghpythonutils.utils.utils import PointHelper
 
 
 class KMeans(PointHelper):
@@ -171,7 +171,7 @@ class KMeans(PointHelper):
         return distortion_cost
 
     def get_centroid(self, points):
-        """Inherited from utils.utils.PointHelper"""
+        """Inherited from ghpythonutils.utils.utils.PointHelper"""
         return self.get_points_cloud_centroid(points)
 
     def get_random_point(self, dimensions, minimum, maximum):

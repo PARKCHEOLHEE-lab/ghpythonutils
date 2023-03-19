@@ -1,5 +1,5 @@
-﻿from utils.kmeans.kmeans import KMeans
-from utils.utils import PointHelper, LineHelper, ConstsCollection
+﻿from ghpythonutils.utils.kmeans.kmeans import KMeans
+from ghpythonutils.utils.utils import PointHelper, LineHelper, ConstsCollection
 import Rhino.Geometry as rg
 import copy
 import math
