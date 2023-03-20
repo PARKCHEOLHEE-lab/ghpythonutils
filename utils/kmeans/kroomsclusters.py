@@ -6,18 +6,20 @@ import math
 from ghpythonlib.components import ShortestWalk
 
 
-class Room:
-    """
-    _description_
-    """
+class Room(ConstsCollection):
+    """Dataclass to each room"""
 
-    def __init__(self, boundary, cells, path):
-        self.boundary = boundary
+    def __init__(self, cells):
         self.cells = cells
-        self.path = path
+        self.room = rg.Curve.CreateBooleanUnion(self.cells)[0]
 
-    def _gen_corridor(self):
-        pass
+        ConstsCollection.__init__(self)
+
+    def is_connected_to_corridor(self, corridor):
+        intersections = rg.Intersect.Intersection.CurveCurve(
+            self.room, corridor, self.TOLERANCE, self.TOLERANCE
+        )
+        return len(intersections) > 0
 
 
 class Boundary:
@@ -34,6 +36,7 @@ class Boundary:
 
     def _gen_estimated_k(self):
         """The K is given floor area divided target area."""
+        assert self.target_area > 0, "Target area is less than zero"
         self.k = int(self.boundary_area / self.target_area)
 
 
@@ -57,23 +60,27 @@ class KRoomsCluster(KMeans, PointHelper, LineHelper, ConstsCollection):
         ConstsCollection.__init__(self)
 
     def get_predicted_rooms(self):
+        self._is_disjoint_floor_and_core()
+
         self._gen_given_axis_aligned_obb()
         self._gen_boundaries()
         self._gen_estimated_grid_size()
         self._gen_grid()
-        self._gen_predicted_rooms()
-        self._gen_network()
-        self._gen_connected_rooms_to_corridor()
+        #        self._gen_predicted_rooms()
+        #        self._gen_network()
+        #        self._gen_connected_rooms_to_corridor()
 
-        return self.krooms
+        return
 
-    def _gen_boundaries(self):
-        boundaries = rg.Curve.CreateBooleanDifference(self.floor, self.core)
+    def _is_disjoint_floor_and_core(self):
+        is_disjoint = (
+            rg.Curve.PlanarClosedCurveRelationship(
+                self.floor, self.core, rg.Plane.WorldXY, self.TOLERANCE
+            )
+            == rg.RegionContainment.Disjoint
+        )
 
-        self.boundaries = []
-        for boundary in boundaries:
-            boundary_object = Boundary(boundary, self.target_area)
-            self.boundaries.append(boundary_object)
+        assert not is_disjoint, "Given floor and core are disjoint"
 
     def _gen_given_axis_aligned_obb(self):
         if self.axis is None:
@@ -89,81 +96,101 @@ class KRoomsCluster(KMeans, PointHelper, LineHelper, ConstsCollection):
         ):
             self.obb.Reverse()
 
+    def _gen_boundaries(self):
+        boundaries = rg.Curve.CreateBooleanDifference(self.floor, self.core)
+
+        self.boundaries = []
+        for boundary in boundaries:
+            boundary_object = Boundary(boundary, self.target_area)
+            self.boundaries.append(boundary_object)
+
     def _gen_estimated_grid_size(self):
         hall_shortest_segment = self.sorted_hall_segments[0]
         self.grid_size = hall_shortest_segment.GetLength()
-        self.grid_size_x = self.sorted_hall_segments[-1].GetLength()
+
+    #        self.grid_size_x = self.sorted_hall_segments[-1].GetLength()
 
     def _gen_grid(self):
-        base_rectangle = self.get_2d_offset_polygon(
-            self.sorted_hall_segments[0], self.grid_size_x / 5
-        )
-
-        #        base_rectangle.Translate(
-        #            (
-        #                self.sorted_hall_segments[0].PointAtStart
-        #                - self.sorted_hall_segments[0].PointAtEnd
-        #            ) / 2
-        #        )
-
-        x_segment, y_segment, _, _ = base_rectangle.DuplicateSegments()
-        anchor = base_rectangle.ToPolyline().CenterPoint()
-        plane = rg.Plane(
-            origin=anchor,
-            xDirection=x_segment.PointAtEnd - x_segment.PointAtStart,
-            yDirection=y_segment.PointAtEnd - x_segment.PointAtStart,
-        )
+        self.base_rectangles = [
+            self.get_2d_offset_polygon(seg, self.grid_size)
+            for seg in self.sorted_hall_segments[:2]
+        ]
 
         counts = []
-        for vi, plane_element in enumerate(plane):
-            if isinstance(plane_element, rg.Point3d):
-                continue
+        planes = []
+        for base_rectangle in self.base_rectangles:
+            x_vector = (
+                rg.AreaMassProperties.Compute(base_rectangle).Centroid
+                - rg.AreaMassProperties.Compute(self.hall).Centroid
+            )
 
-            grid_size = x_segment.GetLength()
-            if vi == 2:
-                grid_size = y_segment.GetLength()
+            y_vector = copy.copy(x_vector)
+            y_transform = rg.Transform.Rotation(
+                math.pi * 0.5,
+                rg.AreaMassProperties.Compute(base_rectangle).Centroid,
+            )
+            y_vector.Transform(y_transform)
 
-            projected_points = [
+            base_rectangle.Translate(
+                (
+                    self.sorted_hall_segments[0].PointAtStart
+                    - self.sorted_hall_segments[0].PointAtEnd
+                )
+                / 2
+            )
+
+            anchor = rg.AreaMassProperties.Compute(base_rectangle).Centroid
+            plane = rg.Plane(
+                origin=anchor,
+                xDirection=x_vector,
+                yDirection=y_vector,
+            )
+
+            x_proj = self.get_projected_point_on_curve(
+                anchor, plane.XAxis, self.obb
+            )
+
+            x_count = (
+                int(math.ceil(x_proj.DistanceTo(anchor) / self.grid_size)) + 1
+            )
+
+            y_projs = [
                 self.get_projected_point_on_curve(
-                    anchor, plane_element, self.obb
+                    anchor, plane.YAxis, self.obb
                 ),
                 self.get_projected_point_on_curve(
-                    anchor, -plane_element, self.obb
+                    anchor, -plane.YAxis, self.obb
                 ),
             ]
 
-            for projected_point in projected_points:
-                if projected_point is None:
-                    continue
+            y_count = [
+                int(math.ceil(y_proj.DistanceTo(anchor) / self.grid_size)) + 1
+                for y_proj in y_projs
+            ]
 
-                count = (
-                    int(
-                        math.ceil(
-                            projected_point.DistanceTo(anchor) / grid_size
-                        )
-                    )
-                    + 1
-                )
+            planes.append(plane)
+            counts.append([x_count] + y_count)
 
-                counts.append(count)
+        x_grid = []
+        for base_rectangle, count, plane in zip(
+            self.base_rectangles, counts, planes
+        ):
+            xc, _, _ = count
 
-        x_vectors = [plane.XAxis, -plane.XAxis]
-        y_vectors = [plane.YAxis, -plane.YAxis]
-
-        x_grid = [base_rectangle]
-        for x_count, x_vector in zip(counts[:2], x_vectors):
-            for xc in range(1, x_count):
+            for x in range(xc):
                 copied_rectangle = copy.copy(base_rectangle)
-                vector = x_vector * x_segment.GetLength() * xc
+                vector = plane.XAxis * self.grid_size * x
                 copied_rectangle.Translate(vector)
                 x_grid.append(copied_rectangle)
 
+        y_vectors = [planes[0].YAxis, -planes[0].YAxis]
+        y_counts = counts[0][1:]
         all_grid = [] + x_grid
         for rectangle in x_grid:
-            for y_count, y_vector in zip(counts[2:], y_vectors):
+            for y_count, y_vector in zip(y_counts, y_vectors):
                 for yc in range(y_count):
                     copied_rectangle = copy.copy(rectangle)
-                    vector = y_vector * y_segment.GetLength() * yc
+                    vector = y_vector * self.grid_size * yc
                     copied_rectangle.Translate(vector)
                     all_grid.append(copied_rectangle)
 
@@ -182,112 +209,129 @@ class KRoomsCluster(KMeans, PointHelper, LineHelper, ConstsCollection):
             rg.AreaMassProperties.Compute(g).Centroid for g in self.grid
         ]
 
-    def _gen_predicted_rooms(self):
-        self.points = self.grid_centroids
-        self.k = self.boundaries[0].k
 
-        _, indices = self.predict(get_indices=True)
-
-        self.rooms = []
-        for each_indices in indices:
-            room = []
-            for index in each_indices:
-                room.append(self.grid[index])
-
-            self.rooms.extend(rg.Curve.CreateBooleanUnion(room))
-
-    def _gen_network(self):
-        self.network = []
-        self.network_length = []
-        for room in self.rooms:
-            for segment in room.DuplicateSegments():
-                self.network.append(segment)
-                self.network_length.append(segment.GetLength())
-
-        start_point_candidates = []
-        for grid in self.grid:
-            intersections = rg.Intersect.Intersection.CurveCurve(
-                grid, self.hall, self.TOLERANCE, self.TOLERANCE
-            )
-
-            for intsc in intersections:
-                rg.Intersect.IntersectionEvent.PointA2
-                start_point_candidates.append(intsc.PointA)
-                start_point_candidates.append(intsc.PointA2)
-
-        self.start_point_candidates = list(
-            rg.Point3d.CullDuplicates(start_point_candidates, self.TOLERANCE)
-        )
-
-        hall_vertices = [s.PointAtStart for s in self.hall.DuplicateSegments()]
-        corner_circles = []
-        for hall_vertex in hall_vertices:
-            corner_circle = rg.Circle(
-                hall_vertex, self.sorted_hall_segments[0].GetLength() / 3
-            ).ToNurbsCurve()
-
-            corner_circles.append(corner_circle)
-
-    def _gen_connected_rooms_to_corridor(self):
-        self.inaccessible_rooms = []
-        for ri, room in enumerate(self.rooms):
-            intersections = rg.Intersect.Intersection.CurveCurve(
-                room, self.hall, self.TOLERANCE, self.TOLERANCE
-            )
-
-            is_accessible = len(intersections) > 0
-            if not is_accessible:
-                self.inaccessible_rooms.append(room)
-
-        hall_centroid = rg.AreaMassProperties.Compute(self.hall).Centroid
-        sorted_inaccessible_rooms = sorted(
-            self.inaccessible_rooms,
-            key=lambda r: rg.AreaMassProperties.Compute(r).Centroid.DistanceTo(
-                hall_centroid
-            ),
-            reverse=True,
-        )
-
-        self.corridor = []
-        for inaccessible_room in sorted_inaccessible_rooms:
-            ic = rg.AreaMassProperties.Compute(inaccessible_room).Centroid
-            start_point = sorted(
-                self.start_point_candidates, key=lambda p: p.DistanceTo(ic)
-            )[0]
-
-            _, start, end = inaccessible_room.ClosestPoints(self.hall)
-
-            corridor_curve, _, _, _ = ShortestWalk.ShortestWalk(
-                self.network,
-                self.network_length,
-                rg.Line(start, end).ToNurbsCurve(),
-            )
-
-            extended_corridor = corridor_curve.Extend(
-                rg.CurveEnd.Both, 1.4, rg.CurveExtensionStyle.Line
-            )
-
-            corridor = self.get_2d_buffered_linestring(
-                extended_corridor, -1.4, True
-            )[0]
-
-            intscs = rg.Curve.CreateBooleanIntersection(self.hall, corridor)
-            if len(intscs) != 0:
-                corridor = self.get_2d_buffered_linestring(
-                    extended_corridor, 1.4, True
-                )[0]
-
-            self.corridor.append(corridor)
-
-        self.corridor = rg.Curve.CreateBooleanUnion(
-            self.corridor + [self.hall]
-        )[0]
-
-        self.krooms = []
-        for room in self.rooms:
-            self.krooms.extend(
-                list(rg.Curve.CreateBooleanDifference(room, self.corridor))
-            )
+#    def _gen_predicted_rooms(self):
+#        self.points = self.grid_centroids
+#        self.k = self.boundaries[0].k
+#
+#        _, indices = self.predict(get_indices=True)
+#
+#        self.rooms = []
+#        for each_indices in indices:
+#            cells = []
+#            for index in each_indices:
+#                cells.append(self.grid[index])
+#
+#            self.rooms.append(Room(cells))
+#
+#    def _gen_network(self):
+#        self.network = []
+#        self.network_length = []
+#
+#        for room in self.rooms:
+#            for segment in room.room.DuplicateSegments():
+#                self.network.append(segment)
+#                self.network_length.append(segment.GetLength())
+#
+#        start_point_candidates = []
+#        for grid in self.grid:
+#            intersections = rg.Intersect.Intersection.CurveCurve(
+#                grid, self.hall, self.TOLERANCE, self.TOLERANCE
+#            )
+#
+#            for intsc in intersections:
+#                start_point_candidates.append(intsc.PointA)
+#                start_point_candidates.append(intsc.PointA2)
+#
+#        self.start_point_candidates = list(
+#            rg.Point3d.CullDuplicates(start_point_candidates, self.TOLERANCE)
+#        )
+#
+#        hall_vertices = [s.PointAtStart for s in self.hall.DuplicateSegments()]
+#        corner_circles = []
+#        for hall_vertex in hall_vertices:
+#            corner_circle = rg.Circle(
+#                hall_vertex, self.sorted_hall_segments[0].GetLength() / 3
+#            ).ToNurbsCurve()
+#
+#            corner_circles.append(corner_circle)
+#
+#    def _gen_connected_rooms_to_corridor(self):
+#        self.inaccessible_rooms = []
+#        for ri, room in enumerate(self.rooms):
+#            is_connected_to_corridor = room.is_connected_to_corridor(self.hall)
+#            if not is_connected_to_corridor:
+#                self.inaccessible_rooms.append(room)
+#
+#        hall_centroid = rg.AreaMassProperties.Compute(self.hall).Centroid
+#        sorted_inaccessible_rooms = sorted(
+#            self.inaccessible_rooms,
+#            key=lambda r: rg.AreaMassProperties.Compute(r.room).Centroid.DistanceTo(
+#                hall_centroid
+#            ),
+#            reverse=True,
+#        )
+#
+#        self.intscs = []
+#
+#        self.corridor = list(rg.Curve.CreateBooleanUnion([self.hall]))
+#        for inaccessible_room in sorted_inaccessible_rooms:
+#            if inaccessible_room.is_connected_to_corridor(self.corridor[0]):
+#                continue
+#
+#            ic = rg.AreaMassProperties.Compute(inaccessible_room.room).Centroid
+#            start_point = sorted(
+#                self.start_point_candidates, key=lambda p: p.DistanceTo(ic)
+#            )[0]
+#
+#            _, start, end = inaccessible_room.room.ClosestPoints(self.hall)
+#
+#            corridor_curve, _, _, _ = ShortestWalk.ShortestWalk(
+#                self.network,
+#                self.network_length,
+#                rg.Line(start, end).ToNurbsCurve(),
+#            )
+#
+#            extended_corridor = corridor_curve.Extend(
+#                rg.CurveEnd.Both, 1.4, rg.CurveExtensionStyle.Line
+#            )
+#
+#            corridor = self.get_2d_buffered_linestring(
+#                extended_corridor, -1.4, True
+#            )[0]
+#
+#            intscs = rg.Curve.CreateBooleanIntersection(self.hall, corridor)
+#            self.intscs.append(extended_corridor)
+#
+#
+#            if len(intscs) != 0:
+#                corridor = self.get_2d_buffered_linestring(
+#                    extended_corridor, 1.4, True
+#                )[0]
+#
+#            self.corridor = list(
+#                rg.Curve.CreateBooleanUnion(self.corridor + [corridor])
+#            )
+#
+#            print(self.corridor)
+#
+#            self.start_point_candidates.extend(
+#                [extended_corridor.PointAtStart, extended_corridor.PointAtEnd]
+#            )
+#
+#
+#            break
+#
+#
+#        self.krooms = []
+#        for room in self.rooms:
+#            self.krooms.extend(
+#                list(
+#                    rg.Curve.CreateBooleanDifference(
+#                        room.room, self.corridor[0]
+#                    )
+#                )
+#            )
 
 
 if __name__ == "__main__":
@@ -300,5 +344,4 @@ if __name__ == "__main__":
 
     krooms = krsc.get_predicted_rooms()
     grid = krsc.grid
-    e = krsc.corridor
-    f = krsc.inaccessible_rooms
+    d = krsc.base_rectangles
