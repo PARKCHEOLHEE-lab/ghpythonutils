@@ -69,7 +69,7 @@ class LineHelper:
             geom (Rhino.Geometry.Curve): Geometry to create the obb
 
         Returns:
-            Rhino.Geometry.Curve: Oriented bounding box aligned to given line axis
+            Rhino.Geometry.Rectangle3d: Oriented bounding box aligned to given line axis
         """
         angle = LineHelper.get_line_2d_angle(linestring)
         anchor = geom.ToPolyline().CenterPoint()
@@ -241,6 +241,56 @@ class LineHelper:
                     vertices.append(line.PointAtEnd)
 
         return vertices
+
+    @staticmethod
+    def get_2d_convexhull(points):
+        """Create 2d convex hull about given points
+
+        Args:
+            points (Rhino.Geometry.Point3d): Points to create convex hull
+
+        Returns:
+            Rhino.Geometry.Curve: 2d Convex hull
+        """
+
+        def cross(a, b, c):
+            return (b.X - a.X) * (c.Y - a.Y) - (b.Y - a.Y) * (c.X - a.X)
+
+        start = min(points, key=lambda p: (p.Y, p.X))
+        sorted_points = sorted(
+            points,
+            key=lambda p: (math.atan2(p.Y - start.Y, p.X - start.X), p.X, p.Y),
+        )
+        hull = [start]
+        for p in sorted_points:
+            while len(hull) >= 2 and cross(hull[-2], hull[-1], p) <= 0:
+                hull.pop()
+
+            hull.append(p)
+
+        return rg.PolylineCurve(hull + [start])
+
+    @staticmethod
+    def get_2d_minimum_obb(geom):
+        """Create the minimum oriented bounding box about given geometry
+
+        Args:
+            geom (Rhino.Geometry.Curve): Geometry to make minimum obb
+
+        Returns:
+            Rhino.geometry.Rectangle3d: Minimum obb
+        """
+        geom_vertices = LineHelper.get_curve_vertices(geom)
+        geom_convexhull_segements = list(
+            LineHelper.get_2d_convexhull(geom_vertices).DuplicateSegments()
+        )
+
+        obbs = []
+        for hull_segment in geom_convexhull_segements:
+            each_obb = LineHelper.get_2d_obb_from_line(hull_segment, geom)
+            obbs.append(each_obb)
+
+        return sorted(obbs, key=lambda b: b.Area)[0]
 
 
 class NumericHelper:
