@@ -11,6 +11,16 @@ repos:
 -   repo: https://github.com/ambv/black
     rev: stable
     hooks:
-      - id: black
+    -   id: black
         language_version: python3.9.7
         exclude: doc/|monitoring/|scripts/|tool/|test/
+
+-   repo: https://github.com/PyCQA/pylint
+    rev: v2.14.0
+    hooks:
+    -   id: pylint
+
+-   repo: https://github.com/pycqa/isort
+    rev: ''
+    hooks:
+    -   id: isort

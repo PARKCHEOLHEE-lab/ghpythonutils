@@ -1,10 +1,11 @@
-﻿import Rhino.Geometry as rg
-import Rhino.Display as rd
+﻿import Rhino.Display as rd
+import Rhino.Geometry as rg
+
 from ghpythonutils.utils.scaler.minmaxscaler import MinMaxScaler
 from ghpythonutils.utils.utils import (
+    ColorsCollection,
     NumericHelper,
     VisualizeHelper,
-    ColorsCollection,
 )
 
 
@@ -67,6 +68,7 @@ class ScorePolygon(
             self.inner_circle, self.score_length
         )
 
+        # pylint: disable=unbalanced-tuple-unpacking
         (
             self.scorepolygon,
             self.scorepolygon_vertices,
@@ -78,6 +80,7 @@ class ScorePolygon(
             self.scoredict,
             self.sub_circle_rad,
         )
+        # pylint: enable=unbalanced-tuple-unpacking
 
         self.visualize(
             self.scoredict,

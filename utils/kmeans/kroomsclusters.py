@@ -1,9 +1,13 @@
-﻿from ghpythonutils.utils.kmeans.kmeans import KMeans
-from ghpythonutils.utils.utils import PointHelper, LineHelper, ConstsCollection
-import Rhino.Geometry as rg
+﻿# pylint: disable-all
+
 import copy
 import math
+
+import Rhino.Geometry as rg
 from ghpythonlib.components import ShortestWalk
+
+from ghpythonutils.utils.kmeans.kmeans import KMeans
+from ghpythonutils.utils.utils import ConstsCollection, LineHelper, PointHelper
 
 
 class Room(ConstsCollection):

@@ -21,7 +21,7 @@ class KMeans(PointHelper):
         self.iteration_count = iteration_count
         self.threshold = 0.1
 
-        import random
+        import random  # pylint: disable=import-outside-toplevel
 
         self.random = random
         self.random.seed(random_seed)
@@ -172,9 +172,12 @@ class KMeans(PointHelper):
 
     def get_centroid(self, points):
         """Inherited from ghpythonutils.utils.utils.PointHelper"""
+
         return self.get_points_cloud_centroid(points)
 
     def get_random_point(self, dimensions, minimum, maximum):
+        """Generate random points when no given points"""
+
         coords = [
             self.random.uniform(minimum, maximum) for _ in range(dimensions)
         ]

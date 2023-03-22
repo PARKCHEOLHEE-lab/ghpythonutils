@@ -1,8 +1,8 @@
-﻿import Rhino.Geometry as rg
-import Rhino.Display as rd
+﻿import copy
 import math
-import copy
 
+import Rhino.Display as rd
+import Rhino.Geometry as rg
 
 CUSTOM_DISPLAY = "custom_display"
 
@@ -291,6 +291,57 @@ class LineHelper:
             obbs.append(each_obb)
 
         return sorted(obbs, key=lambda b: b.Area)[0]
+
+    @staticmethod
+    def get_removed_overlapped_curves(curves):
+        """Remove overlapping curves
+
+        Args:
+            curves (List[Rhino.Geometry.Curve]): Target curves to remove duplicates
+
+        Returns:
+            List[Rhino.Geometry.Curve]: Curves with duplicates removed
+        """
+
+        result_curves = []
+        for edge in curves:
+            exploded_edge = edge.DuplicateSegments()
+            result_curves.extend(exploded_edge)
+
+        ei = 0
+        while ei < len(result_curves):
+            edge = result_curves[ei]
+            edge_centroid = edge.PointAtLength(edge.GetLength() / 2)
+            other_curves = result_curves[:ei] + result_curves[ei + 1 :]
+
+            for other_edge in other_curves:
+                other_edge_centroid = other_edge.PointAtLength(
+                    other_edge.GetLength() / 2
+                )
+
+                intersections = rg.Intersect.Intersection.CurveCurve(
+                    edge,
+                    other_edge,
+                    ConstsCollection.TOLERANCE,
+                    ConstsCollection.TOLERANCE,
+                )
+
+                is_same_centroid = (
+                    edge_centroid.DistanceTo(other_edge_centroid) <= 0
+                )
+
+                for intsc in intersections:
+                    if (
+                        intsc.IsOverlap
+                        and is_same_centroid
+                        and edge in result_curves
+                    ):
+                        result_curves.remove(edge)
+                        ei += -1
+
+            ei += 1
+
+        return result_curves
 
 
 class NumericHelper:
