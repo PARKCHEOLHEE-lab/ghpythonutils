@@ -293,7 +293,7 @@ class LineHelper:
         return sorted(obbs, key=lambda b: b.Area)[0]
 
     @staticmethod
-    def get_removed_overlapped_curves(curves):
+    def get_removed_overlapped_curves(curves, is_needed_for_points=False):
         """Remove overlapping curves
 
         Args:
@@ -326,10 +326,10 @@ class LineHelper:
                     ConstsCollection.TOLERANCE,
                 )
 
-                is_same_centroid = (
-                    edge_centroid.DistanceTo(other_edge_centroid) <= 0
+                is_same_centroid = PointHelper.is_same_points(
+                    edge_centroid, other_edge_centroid
                 )
-
+                
                 for intsc in intersections:
                     if (
                         intsc.IsOverlap
@@ -338,9 +338,19 @@ class LineHelper:
                     ):
                         result_curves.remove(edge)
                         ei += -1
-
+                
             ei += 1
-
+        
+        if is_needed_for_points:
+            result_points = []
+            for edge in result_curves:
+                result_points.extend([edge.PointAtStart, edge.PointAtEnd])
+            result_points = rg.Point3d.CullDuplicates(
+                result_points, ConstsCollection.TOLERANCE
+            )
+            
+            return result_curves, result_points
+        
         return result_curves
 
 
@@ -448,6 +458,27 @@ class PointHelper:
             break
 
         return projected_point
+        
+    @staticmethod
+    def is_same_points(p1, p2):
+        """Check whether p1 and p2 are the same
+        
+        Args:
+            p1 (Rhino.Geometry.Point3d): Point to check
+            p2 (Rhino.Geometry.Point3d): Point to check
+            
+        Returns:
+            bool: Whether two points are the same or not the same
+        """
+        
+        distance = p1.DistanceTo(p2)
+        is_same_points = (
+            distance <= 0 
+            or NumericHelper.is_close(distance, 0) 
+            or p1.Equals(p2)
+        )
+        
+        return is_same_points
 
 
 class VisualizeHelper:
