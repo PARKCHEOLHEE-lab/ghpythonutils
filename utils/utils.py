@@ -480,6 +480,19 @@ class PointHelper:
 
         return is_same_points
 
+    @staticmethod
+    def get_normalized_vector(vector):
+        """Normalize to vector that length 1.0
+
+        Args:
+            vector (Rhino.Geometry.Vector3d): Vector to normalize
+
+        Returns:
+            Rhino.Geometry.Vector3d: Normalized vector
+        """
+
+        return vector / vector.Length
+
 
 class VisualizeHelper:
     """
