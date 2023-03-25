@@ -72,6 +72,10 @@ class Graph(PointHelper, LineHelper, NumericHelper):
         self._gen_graph()
 
     def _gen_network(self):
+        """Generate network data with duplicates lines and vertices removed
+        The structure of network data is like to -> self.network: List[List[int], Rhino.Geometry.Curve]
+        """
+
         cleanup_curves = [
             curve for curve in self.input_curves if curve is not None
         ]
@@ -99,6 +103,8 @@ class Graph(PointHelper, LineHelper, NumericHelper):
             self.network.append([data, curve])
 
     def _gen_graph(self):
+        """Generate the graph through the network data to node and edge composed"""
+
         self.graph_dict = {}
         for node_index in range(len(self.vertices)):
             self.graph_dict[node_index] = Node(node_index)
@@ -127,6 +133,8 @@ class Graph(PointHelper, LineHelper, NumericHelper):
 
 
 class Dijkstra(Graph):
+    """Class to get the shortest path from given curves"""
+
     def __init__(self, input_curves, start_point, target_point):
         self.input_curves = input_curves
         self.start_point = start_point
@@ -141,6 +149,8 @@ class Dijkstra(Graph):
         self._gen_shortest_path()
 
     def _gen_estimated_path(self):
+        """Estimate indices about the given start point and target point"""
+
         for node_index, vertex in enumerate(self.vertices):
             is_start_vertex = isinstance(
                 self.start_point, rg.Point3d
@@ -155,6 +165,8 @@ class Dijkstra(Graph):
                 self.target_index = node_index
 
     def _relax(self):
+        """Calculate the distance between all nodes from the starting point"""
+
         start_vertex = self.get_node(self.start_index)
         start_vertex.distance = 0
 
@@ -184,6 +196,8 @@ class Dijkstra(Graph):
             heapq.heapify(unvisited_queue)
 
     def _gen_shortest_path(self):
+        """Generate the shortest path via relaxed graph data"""
+
         target_vertex = self.get_node(self.target_index)
         shortest_path_indices = [target_vertex.node_index]
         shortest_path_costs = []
