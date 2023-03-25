@@ -6,6 +6,7 @@ import math
 import Rhino.Geometry as rg
 from ghpythonlib.components import ShortestWalk
 
+from ghpythonutils.utils.dijkstra.dijkstra import Dijkstra
 from ghpythonutils.utils.kmeans.kmeans import KMeans
 from ghpythonutils.utils.utils import ConstsCollection, LineHelper, PointHelper
 
@@ -122,7 +123,10 @@ class KRoomsCluster(KMeans, PointHelper, LineHelper, ConstsCollection):
 
         counts = []
         planes = []
-        for base_rectangle in self.base_rectangles:
+
+        copied_hall = copy.copy(self.hall)
+
+        for ri, base_rectangle in enumerate(self.base_rectangles):
             x_vector = (
                 rg.AreaMassProperties.Compute(base_rectangle).Centroid
                 - rg.AreaMassProperties.Compute(self.hall).Centroid
@@ -142,6 +146,15 @@ class KRoomsCluster(KMeans, PointHelper, LineHelper, ConstsCollection):
                 )
                 / 2
             )
+
+            if ri == 0:
+                copied_hall.Translate(
+                    (
+                        self.sorted_hall_segments[0].PointAtStart
+                        - self.sorted_hall_segments[0].PointAtEnd
+                    )
+                    / 2
+                )
 
             anchor = rg.AreaMassProperties.Compute(base_rectangle).Centroid
             plane = rg.Plane(
@@ -190,9 +203,9 @@ class KRoomsCluster(KMeans, PointHelper, LineHelper, ConstsCollection):
         y_vectors = [planes[0].YAxis, -planes[0].YAxis]
         y_counts = counts[0][1:]
         all_grid = [] + x_grid
-        for rectangle in x_grid:
+        for rectangle in x_grid + [copied_hall]:
             for y_count, y_vector in zip(y_counts, y_vectors):
-                for yc in range(y_count):
+                for yc in range(1, y_count):
                     copied_rectangle = copy.copy(rectangle)
                     vector = y_vector * self.grid_size * yc
                     copied_rectangle.Translate(vector)
@@ -213,6 +226,21 @@ class KRoomsCluster(KMeans, PointHelper, LineHelper, ConstsCollection):
             rg.AreaMassProperties.Compute(g).Centroid for g in self.grid
         ]
 
+        self.remained_boundaries = []
+
+
+#        for boundary in self.boundaries:
+#            remained_boundary = rg.Curve.CreateBooleanDifference(
+#                boundary.boundary, self.grid
+#            )
+
+
+#            self.remained_boundaries.extend(remained_boundary)
+
+#            for remained in remained_boundary:
+#                print(remained)
+#
+#        self.remained_boundaries = copied_hall
 
 #    def _gen_predicted_rooms(self):
 #        self.points = self.grid_centroids
@@ -349,3 +377,4 @@ if __name__ == "__main__":
     krooms = krsc.get_predicted_rooms()
     grid = krsc.grid
     d = krsc.base_rectangles
+    e = krsc.remained_boundaries
