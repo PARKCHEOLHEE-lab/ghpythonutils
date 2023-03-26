@@ -71,11 +71,11 @@ class KRoomsCluster(KMeans, PointHelper, LineHelper, ConstsCollection):
         self._gen_boundaries()
         self._gen_estimated_grid_size()
         self._gen_grid()
-        #        self._gen_predicted_rooms()
+        self._gen_predicted_rooms()
         #        self._gen_network()
         #        self._gen_connected_rooms_to_corridor()
 
-        return
+        return [room.room for room in self.rooms]
 
     def _is_disjoint_floor_and_core(self):
         is_disjoint = (
@@ -145,6 +145,10 @@ class KRoomsCluster(KMeans, PointHelper, LineHelper, ConstsCollection):
                     - self.sorted_hall_segments[0].PointAtEnd
                 )
                 / 2
+            )
+
+            base_rectangle.Translate(
+                self.get_normalized_vector(x_vector) * -self.grid_size / 2
             )
 
             if ri == 0:
@@ -226,36 +230,21 @@ class KRoomsCluster(KMeans, PointHelper, LineHelper, ConstsCollection):
             rg.AreaMassProperties.Compute(g).Centroid for g in self.grid
         ]
 
-        self.remained_boundaries = []
+    def _gen_predicted_rooms(self):
+        self.points = self.grid_centroids
+        self.k = self.boundaries[0].k
+
+        _, indices = self.predict(get_indices=True)
+
+        self.rooms = []
+        for each_indices in indices:
+            cells = []
+            for index in each_indices:
+                cells.append(self.grid[index])
+
+            self.rooms.append(Room(cells))
 
 
-#        for boundary in self.boundaries:
-#            remained_boundary = rg.Curve.CreateBooleanDifference(
-#                boundary.boundary, self.grid
-#            )
-
-
-#            self.remained_boundaries.extend(remained_boundary)
-
-#            for remained in remained_boundary:
-#                print(remained)
-#
-#        self.remained_boundaries = copied_hall
-
-#    def _gen_predicted_rooms(self):
-#        self.points = self.grid_centroids
-#        self.k = self.boundaries[0].k
-#
-#        _, indices = self.predict(get_indices=True)
-#
-#        self.rooms = []
-#        for each_indices in indices:
-#            cells = []
-#            for index in each_indices:
-#                cells.append(self.grid[index])
-#
-#            self.rooms.append(Room(cells))
-#
 #    def _gen_network(self):
 #        self.network = []
 #        self.network_length = []
@@ -376,5 +365,3 @@ if __name__ == "__main__":
 
     krooms = krsc.get_predicted_rooms()
     grid = krsc.grid
-    d = krsc.base_rectangles
-    e = krsc.remained_boundaries
