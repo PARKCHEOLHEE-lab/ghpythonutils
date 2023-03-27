@@ -166,11 +166,14 @@ class LineHelper:
             List[Rhino.Geometry.Curve]: Buffered linestring
         """
 
-        linestring = linestring.Simplify(
+        simplified_linestring = linestring.Simplify(
             rg.CurveSimplifyOptions.Merge,
             ConstsCollection.TOLERANCE,
             ConstsCollection.TOLERANCE,
         )
+
+        if simplified_linestring is not None:
+            linestring = simplified_linestring
 
         exploded_linestring = linestring.DuplicateSegments()
         first_line = exploded_linestring[0]
