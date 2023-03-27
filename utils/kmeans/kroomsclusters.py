@@ -38,15 +38,16 @@ class Room(ConstsCollection):
                     == rg.PointContainment.Coincident
                 )
 
-                is_floor_overlap = (
-                    rg.Curve.Contains(
-                        self.floor_boundary, cell_vertex, rg.Plane.WorldXY
+                for boundary in self.floor_boundary:
+                    is_floor_overlap = (
+                        rg.Curve.Contains(
+                            boundary, cell_vertex, rg.Plane.WorldXY
+                        )
+                        == rg.PointContainment.Coincident
                     )
-                    == rg.PointContainment.Coincident
-                )
 
-                if is_overlap and not is_floor_overlap:
-                    self.boundary_points.append(cell_vertex)
+                    if is_overlap and not is_floor_overlap:
+                        self.boundary_points.append(cell_vertex)
 
 
 class Boundary:
@@ -124,10 +125,12 @@ class KRoomsCluster(KMeans, PointHelper, LineHelper, ConstsCollection):
             self.obb.Reverse()
 
     def _gen_boundaries(self):
-        boundaries = rg.Curve.CreateBooleanDifference(self.floor, self.core)
+        self.diff_floor = rg.Curve.CreateBooleanDifference(
+            self.floor, self.core
+        )
 
         self.boundaries = []
-        for boundary in boundaries:
+        for boundary in self.diff_floor:
             boundary_object = Boundary(boundary, self.target_area)
             self.boundaries.append(boundary_object)
 
@@ -271,7 +274,7 @@ class KRoomsCluster(KMeans, PointHelper, LineHelper, ConstsCollection):
             for index in each_indices:
                 cells.append(self.grid[index])
 
-            self.rooms.append(Room(cells, self.floor))
+            self.rooms.append(Room(cells, self.diff_floor))
 
     def _gen_corridor(self):
         self.start_point_candidates = [
@@ -294,9 +297,21 @@ class KRoomsCluster(KMeans, PointHelper, LineHelper, ConstsCollection):
             reverse=True,
         )
 
-        self.intscs = []
+        self.network = []
+        for grid_segment in self.get_removed_overlapped_curves(self.grid):
+            intersections = rg.Intersect.Intersection.CurveCurve(
+                grid_segment, self.core, self.TOLERANCE, self.TOLERANCE
+            )
 
-        self.corridor = list(rg.Curve.CreateBooleanUnion([self.hall]))
+            for intersect in intersections:
+                if not intersect.IsOverlap:
+                    self.network.append(grid_segment)
+
+            if len(intersections) < 1:
+                self.network.append(grid_segment)
+
+        self.corridor = [self.hall]
+        self.asdf = []
         for inaccessible_room in sorted_inaccessible_rooms:
             if inaccessible_room.is_connected_to_corridor(self.corridor[0]):
                 continue
@@ -306,48 +321,24 @@ class KRoomsCluster(KMeans, PointHelper, LineHelper, ConstsCollection):
                 self.start_point_candidates, key=lambda p: p.DistanceTo(ic)
             )[0]
 
+            room_points = rg.PointCloud(inaccessible_room.boundary_points)
+            closest_index = room_points.ClosestPoint(start_point)
+            target_point = inaccessible_room.boundary_points[closest_index]
 
-#            print(inaccessible_room.cells)
+            print(target_point)
 
-#
-#            _, start, end = inaccessible_room.room.ClosestPoints(self.hall)
-#
-#            corridor_curve, _, _, _ = ShortestWalk.ShortestWalk(
-#                self.network,
-#                self.network_length,
-#                rg.Line(start, end).ToNurbsCurve(),
-#            )
-#
-#            extended_corridor = corridor_curve.Extend(
-#                rg.CurveEnd.Both, 1.4, rg.CurveExtensionStyle.Line
-#            )
-#
-#            corridor = self.get_2d_buffered_linestring(
-#                extended_corridor, -1.4, True
-#            )[0]
-#
-#            intscs = rg.Curve.CreateBooleanIntersection(self.hall, corridor)
-#            self.intscs.append(extended_corridor)
-#
-#
-#            if len(intscs) != 0:
-#                corridor = self.get_2d_buffered_linestring(
-#                    extended_corridor, 1.4, True
-#                )[0]
-#
-#            self.corridor = list(
-#                rg.Curve.CreateBooleanUnion(self.corridor + [corridor])
-#            )
-#
-#            print(self.corridor)
-#
-#            self.start_point_candidates.extend(
-#                [extended_corridor.PointAtStart, extended_corridor.PointAtEnd]
-#            )
-#
-#
-#            break
-#
+            dijkstra = Dijkstra(self.network, start_point, target_point)
+            corridor_line = rg.Curve.JoinCurves(dijkstra.shortest_path)[0]
+
+            each_corridor = self.get_2d_buffered_linestring(
+                corridor_line, self.grid_size
+            )[0]
+
+            self.corridor.append(each_corridor)
+
+        self.corridor = rg.Curve.CreateBooleanUnion(self.corridor)
+
+
 #
 #        self.krooms = []
 #        for room in self.rooms:
@@ -372,4 +363,5 @@ if __name__ == "__main__":
 
     import ghpythonlib.treehelpers as gt
 
+    d = krsc.corridor
     e = gt.list_to_tree([kroom.boundary_points for kroom in krsc.rooms])
