@@ -166,14 +166,7 @@ class LineHelper:
             List[Rhino.Geometry.Curve]: Buffered linestring
         """
 
-        simplified_linestring = linestring.Simplify(
-            rg.CurveSimplifyOptions.Merge,
-            ConstsCollection.TOLERANCE,
-            ConstsCollection.TOLERANCE,
-        )
-
-        if simplified_linestring is not None:
-            linestring = simplified_linestring
+        linestring = LineHelper.get_simplified_curve(linestring)
 
         exploded_linestring = linestring.DuplicateSegments()
         first_line = exploded_linestring[0]
@@ -355,6 +348,75 @@ class LineHelper:
             return result_curves, result_points
 
         return result_curves
+
+    @staticmethod
+    def get_simplified_curve(linestring):
+        """Custom simplified curve function
+
+        Args:
+            linestring (Rhino.Geometry.Curve): Curve to simplify
+
+        Returns:
+            Rhino.Geometry.Curve: Simplified curve
+        """
+
+        exploded_input_poly = linestring.DuplicateSegments()
+
+        simplified = [exploded_input_poly[0]]
+
+        si = 0
+        while si < len(exploded_input_poly):
+            curr_segment = exploded_input_poly[si]
+            prev_segment = simplified[-1]
+            next_segment = simplified[0]
+
+            is_last_si = si == len(exploded_input_poly) - 1
+
+            curr_segment_angle = LineHelper.get_line_2d_angle(curr_segment)
+            prev_segment_angle = LineHelper.get_line_2d_angle(prev_segment)
+            next_segment_angle = LineHelper.get_line_2d_angle(next_segment)
+
+            is_needed_merge_curr_and_prev = NumericHelper.is_close(
+                curr_segment_angle, prev_segment_angle
+            ) and PointHelper.is_same_points(
+                prev_segment.PointAtEnd, curr_segment.PointAtStart
+            )
+
+            is_needed_merge_curr_and_next = (
+                NumericHelper.is_close(curr_segment_angle, next_segment_angle)
+                and PointHelper.is_same_points(
+                    curr_segment.PointAtEnd, next_segment.PointAtStart
+                )
+                and is_last_si
+            )
+
+            if is_needed_merge_curr_and_prev and is_needed_merge_curr_and_next:
+                vertex_1 = LineHelper.get_curve_vertices(simplified[-1])[0]
+                vertex_2 = LineHelper.get_curve_vertices(simplified[0])[-1]
+                simplified.append(rg.PolylineCurve([vertex_1, vertex_2]))
+
+                del simplified[0]
+                del simplified[-2]
+
+            elif is_needed_merge_curr_and_prev:
+                vertex_1 = LineHelper.get_curve_vertices(prev_segment)[0]
+                vertex_2 = LineHelper.get_curve_vertices(curr_segment)[-1]
+                simplified[-1] = rg.PolylineCurve([vertex_1, vertex_2])
+
+            elif is_needed_merge_curr_and_next:
+                vertex_1 = LineHelper.get_curve_vertices(curr_segment)[0]
+                vertex_2 = LineHelper.get_curve_vertices(next_segment)[-1]
+                simplified.append(rg.PolylineCurve([vertex_1, vertex_2]))
+
+                del simplified[0]
+
+            else:
+                if si != 0:
+                    simplified.append(curr_segment)
+
+            si += 1
+
+        return rg.Curve.JoinCurves(simplified)
 
 
 class NumericHelper:
