@@ -351,7 +351,7 @@ class LineHelper:
 
     @staticmethod
     def get_simplified_curve(linestring):
-        """Custom simplified curve function
+        """Custom curve simplification method
 
         Args:
             linestring (Rhino.Geometry.Curve): Curve to simplify
