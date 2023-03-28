@@ -52,11 +52,12 @@ class Node:
         self.adjacent[vertex] = cost
 
 
-class Graph(PointHelper, LineHelper, NumericHelper):
+class Graph(PointHelper, LineHelper, NumericHelper, ConstsCollection):
     """Graph to node and edge composed"""
 
-    def __init__(self, input_curves):
+    def __init__(self, input_curves, is_remove_overlapped_curves=False):
         self.input_curves = input_curves
+        self.is_remove_overlapped_curves = is_remove_overlapped_curves
 
         PointHelper.__init__(self)
         LineHelper.__init__(self)
@@ -80,9 +81,18 @@ class Graph(PointHelper, LineHelper, NumericHelper):
             curve for curve in self.input_curves if curve is not None
         ]
 
-        self.curves, self.vertices = self.get_removed_overlapped_curves(
-            cleanup_curves, is_needed_for_points=True
-        )
+        self.curves = self.input_curves
+        self.vertices = []
+        for curve in self.curves:
+            self.vertices.append(curve.PointAtStart)
+            self.vertices.append(curve.PointAtEnd)
+
+        self.vertices = rg.Point3d.CullDuplicates(self.vertices, self.TOLERANCE)
+
+        if self.is_remove_overlapped_curves:
+            self.curves, self.vertices = self.get_removed_overlapped_curves(
+                cleanup_curves, is_needed_for_points=True
+            )
 
         self.network = []
         for curve in self.curves:
@@ -135,12 +145,19 @@ class Graph(PointHelper, LineHelper, NumericHelper):
 class Dijkstra(Graph):
     """Class to get the shortest path from given curves"""
 
-    def __init__(self, input_curves, start_point, target_point):
+    def __init__(
+        self,
+        input_curves,
+        start_point,
+        target_point,
+        is_remove_overlapped_curves=False,
+    ):
         self.input_curves = input_curves
         self.start_point = start_point
         self.target_point = target_point
+        self.is_remove_overlapped_curves = is_remove_overlapped_curves
 
-        Graph.__init__(self, input_curves)
+        Graph.__init__(self, input_curves, is_remove_overlapped_curves)
         self._run()
 
     def _run(self):
