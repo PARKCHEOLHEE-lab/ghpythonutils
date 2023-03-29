@@ -418,6 +418,26 @@ class LineHelper:
 
         return rg.Curve.JoinCurves(simplified)
 
+    @staticmethod
+    def get_curve_sublinestring(linestring, start, length):
+        """_summary_
+
+        Args:
+            linestring (_type_): _description_
+            start (_type_): _description_
+            length (_type_): _description_
+
+        Returns:
+            _type_: _description_
+        """
+
+        splitted_curve = linestring.Split([float(start), start + float(length)])
+
+        if start <= 0:
+            return splitted_curve[0]
+
+        return splitted_curve[1]
+
 
 class NumericHelper:
     @staticmethod
@@ -651,3 +671,6 @@ class VisualizeHelper:
             globals()[CUSTOM_DISPLAY].AddPolygon(
                 polygon, fill_color, edge_color, draw_fill, draw_edge
             )
+
+
+# a = LineHelper.get_curve_sublinestring(x, 100, 50)
