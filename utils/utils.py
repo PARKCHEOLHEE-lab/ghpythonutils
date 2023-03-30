@@ -420,15 +420,15 @@ class LineHelper:
 
     @staticmethod
     def get_curve_sublinestring(linestring, start, length):
-        """_summary_
+        """Get the given linestring's substring
 
         Args:
-            linestring (_type_): _description_
-            start (_type_): _description_
-            length (_type_): _description_
+            linestring (Rhino.Geometry.Curve): Linestring to get the substring
+            start (float): Start location
+            length (float): Length of Substring
 
         Returns:
-            _type_: _description_
+            Rhino.Geometry.Curve: Sublinestring
         """
 
         splitted_curve = linestring.Split([float(start), start + float(length)])
@@ -671,6 +671,3 @@ class VisualizeHelper:
             globals()[CUSTOM_DISPLAY].AddPolygon(
                 polygon, fill_color, edge_color, draw_fill, draw_edge
             )
-
-
-# a = LineHelper.get_curve_sublinestring(x, 100, 50)
