@@ -72,7 +72,13 @@ class LineHelper:
             Rhino.Geometry.Rectangle3d: Oriented bounding box aligned to given line axis
         """
         angle = LineHelper.get_line_2d_angle(linestring)
-        anchor = geom.ToPolyline().CenterPoint()
+
+        anchor = PointHelper.get_points_cloud_centroid(
+            LineHelper.get_curve_vertices(linestring)
+        )
+
+        if linestring.IsClosed:
+            anchor = geom.ToPolyline().CenterPoint()
 
         negative_transform = rg.Transform.Rotation(-angle, anchor)
         positive_transform = rg.Transform.Rotation(angle, anchor)
