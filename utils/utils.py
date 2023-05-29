@@ -173,8 +173,12 @@ class LineHelper:
         """
 
         linestring = LineHelper.get_simplified_curve(linestring)
-
-        exploded_linestring = linestring.DuplicateSegments()
+        exploded_linestring = []
+        for l in linestring:
+            exploded_linestring.extend(
+                l.DuplicateSegments()
+            )
+            
         first_line = exploded_linestring[0]
 
         is_plane_creation_succeed, section_plane = first_line.FrameAt(0)
@@ -191,24 +195,25 @@ class LineHelper:
         if is_single_side:
             vector_1 = section_plane.YAxis * distance
             vector_2 = -section_plane.YAxis * 0
-
-        section = rg.Line(
-            linestring.PointAtStart + vector_1,
-            linestring.PointAtStart + vector_2,
-        ).ToNurbsCurve()
-
-        buffered_linestring = rg.Brep.CreateFromSweep(
-            rail=linestring,
-            shape=section,
-            closed=True,
-            tolerance=ConstsCollection.TOLERANCE,
-        )
-
-        buffered_linestring_outer = []
-        for line in buffered_linestring:
-            buffered_linestring_outer.extend(
-                list(line.DuplicateNakedEdgeCurves(True, False))
+        
+        for each_linestring in linestring:
+            section = rg.Line(
+                each_linestring.PointAtStart + vector_1,
+                each_linestring.PointAtStart + vector_2,
+            ).ToNurbsCurve()
+    
+            buffered_linestring = rg.Brep.CreateFromSweep(
+                rail=each_linestring,
+                shape=section,
+                closed=True,
+                tolerance=ConstsCollection.TOLERANCE,
             )
+    
+            buffered_linestring_outer = []
+            for line in buffered_linestring:
+                buffered_linestring_outer.extend(
+                    list(line.DuplicateNakedEdgeCurves(True, False))
+                )
 
         return list(rg.Curve.JoinCurves(buffered_linestring_outer))
 
