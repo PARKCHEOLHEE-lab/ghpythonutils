@@ -1,10 +1,28 @@
 ﻿import copy
 import math
+import time
 
 import Rhino.Display as rd
 import Rhino.Geometry as rg
 
 CUSTOM_DISPLAY = "custom_display"
+            
+
+def runtime_calculator(func):
+    """This is a calculation function 
+        for the time taken as the shape of `decorator`
+    """
+    
+    def runtime_calculator_wrapper(*args, **kwargs):
+        start = time.time()
+        result = func(*args, **kwargs)
+        end = time.time()
+        time_taken = end - start
+        print("Run time: {}".format(time_taken))
+        
+        return result
+    
+    return runtime_calculator_wrapper
 
 
 class ConstsCollection:
