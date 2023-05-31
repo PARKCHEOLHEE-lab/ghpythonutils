@@ -1,2 +1,4 @@
 *.rhl
 *.3dmbak
+*.pyc
+__pycache__/

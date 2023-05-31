@@ -1,27 +1,30 @@
 ﻿import copy
 import math
+import random
 import time
 
 import Rhino.Display as rd
 import Rhino.Geometry as rg
+import rhinoscriptsyntax as rs
+from ghpythonlib.treehelpers import list_to_tree
 
 CUSTOM_DISPLAY = "custom_display"
-            
+
 
 def runtime_calculator(func):
-    """This is a calculation function 
-        for the time taken as the shape of `decorator`
+    """This is a calculation function
+    for the time taken as the shape of `decorator`
     """
-    
+
     def runtime_calculator_wrapper(*args, **kwargs):
         start = time.time()
         result = func(*args, **kwargs)
         end = time.time()
         time_taken = end - start
         print("Run time: {}".format(time_taken))
-        
+
         return result
-    
+
     return runtime_calculator_wrapper
 
 
@@ -38,6 +41,28 @@ class ColorsCollection:
     COLOR_RED = rd.ColorHSL(1, 0, 1, 0.5)
     COLOR_GREEN = rd.ColorHSL(1, 0.333, 1, 0.5)
     COLOR_BLUE = rd.ColorHSL(1, 0.666, 1, 0.5)
+
+    @staticmethod
+    def get_random_colors_per_each_branch(tree):
+        """Random colors generator as much as the number of branches
+
+        Args:
+            tree (Grasshopper.DataTree): Data for coloring
+
+        Returns:
+            Grasshopper.DataTree: Colors tree, generated randomly
+        """
+
+        colors = []
+
+        for branch in tree.Branches:
+            r = random.randint(0, 150)
+            g = random.randint(0, 150)
+            b = random.randint(0, 150)
+
+            colors.append([rs.CreateColor(r, g, b)] * len(branch))
+
+        return list_to_tree(colors)
 
 
 class Enum:
@@ -193,10 +218,8 @@ class LineHelper:
         linestring = LineHelper.get_simplified_curve(linestring)
         exploded_linestring = []
         for l in linestring:
-            exploded_linestring.extend(
-                l.DuplicateSegments()
-            )
-            
+            exploded_linestring.extend(l.DuplicateSegments())
+
         first_line = exploded_linestring[0]
 
         is_plane_creation_succeed, section_plane = first_line.FrameAt(0)
@@ -213,20 +236,20 @@ class LineHelper:
         if is_single_side:
             vector_1 = section_plane.YAxis * distance
             vector_2 = -section_plane.YAxis * 0
-        
+
         for each_linestring in linestring:
             section = rg.Line(
                 each_linestring.PointAtStart + vector_1,
                 each_linestring.PointAtStart + vector_2,
             ).ToNurbsCurve()
-    
+
             buffered_linestring = rg.Brep.CreateFromSweep(
                 rail=each_linestring,
                 shape=section,
                 closed=True,
                 tolerance=ConstsCollection.TOLERANCE,
             )
-    
+
             buffered_linestring_outer = []
             for line in buffered_linestring:
                 buffered_linestring_outer.extend(
