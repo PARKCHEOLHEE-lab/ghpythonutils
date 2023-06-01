@@ -1,5 +1,5 @@
 from flask import Flask, jsonify
-from utils import *
+from p2m import P2M
 
 
 app = Flask(__name__)
@@ -8,11 +8,12 @@ app = Flask(__name__)
 @app.route("/p2m/<path:image_path_param>")
 def p2m(image_path_param):
     """convert plan to model"""
-    print(image_path_param)
+    
+    wall_coordinates = P2M(image_path_param).wall_coordinates
     
     return jsonify(
         {
-            "path": image_path_param
+            "wall_coordinates": wall_coordinates
         }
     )
 
