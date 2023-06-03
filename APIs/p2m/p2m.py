@@ -20,7 +20,7 @@ class P2M:
 
     # for shapely
     TOLERANCE_SIMPLIFY = 0.01
-    MIN_AREA_GEOM = 1000
+    MIN_AREA_GEOM = 500
     
     def __init__(self, path: str) -> None:
         self.path = path
@@ -53,17 +53,23 @@ class P2M:
         """Converts list of coordinates to list of polygon"""
 
         contours, _ = cv2.findContours(self.wall_image_cleaned, cv2.RETR_CCOMP, cv2.CHAIN_APPROX_SIMPLE)
+        
+        image_boundary_area = (self.wall_image_cleaned.shape[0] - 1) * (self.wall_image_cleaned.shape[1] - 1)
 
         wall_coordinates = []
-        for ci, contour in enumerate(contours):
+        for contour in contours:
+            
+            coords = [[x, -y] for (x, y), *_ in contour]
+            
+            # if current contours are just line, skip
+            if len(coords) <= 2:
+                continue
+            
+            wall_geometry = Polygon(coords).simplify(self.TOLERANCE_SIMPLIFY)
 
             # Skip the image's boundary coordinates. 
-            # Very first iteration is boundary of it
-            if ci == 0:
+            if np.isclose(wall_geometry.area, image_boundary_area):
                 continue
-
-            coords = [list(coord) for coord, *_ in contour]
-            wall_geometry = Polygon(coords).simplify(self.TOLERANCE_SIMPLIFY)
 
             if wall_geometry.area >= self.MIN_AREA_GEOM: 
                 wall_coord = list(wall_geometry.boundary.coords)
