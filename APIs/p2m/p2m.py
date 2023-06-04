@@ -2,7 +2,7 @@
 import cv2
 import numpy as np
 
-from typing import List
+from typing import List, Tuple
 from shapely.geometry import Polygon
 
 
@@ -49,7 +49,7 @@ class P2M:
         
         return cleaned_image
     
-    def get_wall_coordinates(self) -> List[Polygon]:
+    def get_wall_coordinates(self) -> List[List[Tuple[int]]]:
         """Converts list of coordinates to list of polygon"""
 
         contours, _ = cv2.findContours(self.wall_image_cleaned, cv2.RETR_CCOMP, cv2.CHAIN_APPROX_SIMPLE)
