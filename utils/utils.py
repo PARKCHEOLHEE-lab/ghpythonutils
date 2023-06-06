@@ -490,6 +490,28 @@ class LineHelper:
 
         return splitted_curve[1]
 
+    @staticmethod
+    def get_extended_linestring(linestring, start=0, end=0):
+        """Get extended linestring with start and end length
+
+        Args:
+            linestring (Rhino.Geometry.Curve): Linestring to get the substring
+            start (float): Start length to extend
+            end (float): End length to extend
+
+        Returns:
+            Rhino.Geometry.Curve: Extended linestring
+        """
+
+        vector_to_extend = PointHelper.get_normalized_vector(
+            linestring.PointAtEnd - linestring.PointAtStart
+        )
+
+        extended_start = vector_to_extend * -start + linestring.PointAtStart
+        extended_end = vector_to_extend * end + linestring.PointAtEnd
+
+        return rg.PolylineCurve([extended_start, extended_end])
+
 
 class NumericHelper:
     @staticmethod
