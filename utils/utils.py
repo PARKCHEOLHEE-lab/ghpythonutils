@@ -222,7 +222,10 @@ class LineHelper:
 
         first_line = exploded_linestring[0]
 
-        is_plane_creation_succeed, section_plane = first_line.FrameAt(0)
+        is_plane_creation_succeed, section_plane = first_line.FrameAt(
+            first_line.GetLength() + 1
+        )
+
         if not is_plane_creation_succeed:
             angle = LineHelper.get_line_2d_angle(first_line)
             transform = rg.Transform.Rotation(angle, section_plane.Origin)

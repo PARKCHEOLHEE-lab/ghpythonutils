@@ -1,9 +1,7 @@
-from typing import List
+from typing import List, Tuple
 
 import cv2
 import numpy as np
-
-from typing import List, Tuple
 from shapely.geometry import Polygon
 
 
@@ -54,7 +52,7 @@ class P2M:
         )
 
         return cleaned_image
-    
+
     def get_wall_coordinates(self) -> List[List[Tuple[int]]]:
         """Converts list of coordinates to list of polygon"""
 
