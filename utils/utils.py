@@ -1,6 +1,7 @@
 ﻿import copy
 import math
 import random
+import re
 import time
 
 import Rhino.Display as rd
@@ -748,3 +749,81 @@ class VisualizeHelper:
             globals()[CUSTOM_DISPLAY].AddPolygon(
                 polygon, fill_color, edge_color, draw_fill, draw_edge
             )
+
+
+class StringHelper:
+    @staticmethod
+    def get_geometries_from_wkt(wkt):
+        """Parses WKT and converts to Rhino geometries
+           https://chat.openai.com/share/fbc9a714-8711-4854-8c4e-65cea90aff76
+
+        Args:
+            wkt (str): Well-known text representation of geometry
+
+        Returns:
+            Rhino.Geometry.Polyline: Converted geometry to Polyline
+
+        TODO:
+            `POINT`, `LINESTRING` handling. Handles only `POLYGON` currently
+        """
+
+        geometry_list = []
+
+        wkt_geometries = wkt.split(";")
+
+        for wkt_geometry in wkt_geometries:
+            match = re.match(r"(\w+)\s*\((.*)\)", wkt_geometry)
+
+            if match:
+                geometry_type = match.group(1).upper()
+                coordinates = match.group(2)
+
+                if geometry_type == "GEOMETRYCOLLECTION":
+                    coordinates = coordinates[:-1]
+
+                    sub_geometries = coordinates.split("POLYGON")[1:]
+
+                    sub_geometries_wkt = []
+                    for wi, sw in enumerate(sub_geometries):
+                        sub_wkt = "POLYGON" + sw
+
+                        if wi == len(sub_geometries) - 1:
+                            sub_wkt = sub_wkt + ")"
+                        else:
+                            sub_wkt = sub_wkt[:-2]
+
+                        sub_geometries_wkt.append(sub_wkt)
+
+                    sub_geometry_list = [
+                        StringHelper.get_geometries_from_wkt(sw)[0]
+                        for sw in sub_geometries_wkt
+                    ]
+
+                    geometry_list.extend(sub_geometry_list)
+
+                elif geometry_type == "POLYGON":
+                    coordinates = coordinates[:-1]
+
+                    rings = coordinates.split("),")
+
+                    polygon_vertices = []
+
+                    for ring in rings:
+                        ring = ring[1:]
+
+                        if ring.endswith(")"):
+                            ring = ring[:-1]
+
+                        vertices = [
+                            map(float, coord.split())
+                            for coord in ring.split(",")
+                        ]
+
+                        polygon_vertices.extend(
+                            [rg.Point3d(x, y, 0) for x, y in vertices]
+                        )
+
+                    polyline = rg.Polyline(polygon_vertices)
+                    geometry_list.append(polyline)
+
+        return geometry_list
