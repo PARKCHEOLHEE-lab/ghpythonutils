@@ -516,6 +516,60 @@ class LineHelper:
 
         return rg.PolylineCurve([extended_start, extended_end])
 
+    @staticmethod
+    def get_2d_grid_by_aabb(
+            axis_line, polygon, grid_size, return_to_tree=False
+        ):
+            
+        if not polygon.IsClosed:
+            raise Exception("A given polygon is opened")
+        
+        world_x_line = rg.LineCurve(
+            rg.Point3d(0, 0, 0), rg.Point3d(1, 0, 0)
+        )
+        aabb = LineHelper.get_2d_obb_from_line(world_x_line, polygon)
+        aabb = aabb.ToNurbsCurve()
+        aabb_exploded = aabb.DuplicateSegments()
+        
+        x_seg, _, _, y_seg = aabb_exploded
+        x_count = int(math.ceil(x_seg.GetLength() / grid_size))
+        y_count = int(math.ceil(y_seg.GetLength() / grid_size))
+        
+        x_seg_vector = PointHelper.get_normalized_vector(
+            x_seg.PointAtEnd - x_seg.PointAtStart
+        )
+        
+        y_seg_vector = PointHelper.get_normalized_vector(
+            y_seg.PointAtStart - y_seg.PointAtEnd
+        )
+        
+        start_pt = x_seg.PointAtStart
+        
+        grid = []
+        for yc in range(y_count):
+            curr_y_vector = y_seg_vector * yc * grid_size
+            
+            grid_row = []
+            for xc in range(x_count):
+                curr_x_vector = x_seg_vector * xc * grid_size
+                
+                grid_p1 = start_pt + curr_y_vector + curr_x_vector
+                grid_p2 = grid_p1 + x_seg_vector * grid_size
+                grid_p3 = grid_p2 + y_seg_vector * grid_size
+                grid_p4 = grid_p3 - x_seg_vector * grid_size
+                
+                cell = rg.PolylineCurve(
+                    [grid_p1, grid_p2, grid_p3, grid_p4, grid_p1]
+                )
+                
+                grid_row.append(cell)
+            grid.append(grid_row)
+        
+        if return_to_tree:
+            return list_to_tree(grid)
+        
+        return grid
+
 
 class NumericHelper:
     @staticmethod
@@ -549,6 +603,38 @@ class NumericHelper:
         return all(
             NumericHelper.is_close(num, target, tolerance) for num in nums
         )
+        
+    @staticmethod
+    def get_binary_grid(polygon, grid, is_centroid=False):
+        
+        binary_void = "0"
+        binary_solid = "1"
+        
+        binary_grid = []
+        for grid_row in reversed(grid):
+            binary_grid_row = []
+            
+            for cell in grid_row:
+                if is_centroid:
+                    cell_centroid = rg.AreaMassProperties.Compute(cell).Centroid
+                    if polygon.Contains(cell_centroid) == rg.PointContainment.Inside:
+                        binary_grid_row.append(binary_solid)
+                    else:
+                        binary_grid_row.append(binary_void)
+                    
+                else:
+                    cell_vertices = LineHelper.get_curve_vertices(cell)
+                    if all(
+                        polygon.Contains(vertex) == rg.PointContainment.Inside 
+                        for vertex in cell_vertices
+                    ):
+                        binary_grid_row.append(binary_solid)
+                    else:
+                        binary_grid_row.append(binary_void)
+                        
+            binary_grid.append(binary_grid_row)
+        
+        return binary_grid
 
 
 class SurfaceHelper:
@@ -827,3 +913,22 @@ class StringHelper:
                     geometry_list.append(polyline)
 
         return geometry_list
+
+
+grid = LineHelper.get_2d_grid_by_aabb(
+    y,
+    x,
+    grid_size=1.1,
+    return_to_tree=False
+)
+
+a = LineHelper.get_2d_grid_by_aabb(
+    y,
+    x,
+    grid_size=1.1,
+    return_to_tree=True
+)
+
+print(NumericHelper.get_binary_grid(x, grid, is_centroid=False))
+
+
