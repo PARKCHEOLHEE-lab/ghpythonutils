@@ -35,6 +35,9 @@ class ConstsCollection:
     HALF = 0.5
     INF = 1e15
 
+    BINARY_VOID = "0"
+    BINARY_SOLID = "1"
+
 
 class ColorsCollection:
     COLOR_BLACK = rd.ColorHSL(1, 0, 0, 0)
@@ -517,58 +520,146 @@ class LineHelper:
         return rg.PolylineCurve([extended_start, extended_end])
 
     @staticmethod
-    def get_2d_grid_by_aabb(
-            axis_line, polygon, grid_size, return_to_tree=False
-        ):
-            
+    def get_2d_grid_by_aabb(polygon, grid_size, return_to_tree=False):
+        """Create an axis-aligned bounding box by the given polygon
+
+        Args:
+            polygon (Rhino.Geometry.PolylineCurve): polygon for creating an aabb
+            grid_size (float): size of the each grid cell
+            return_to_tree (bool, optional): whether return value to tree type. Defaults to False.
+
+        Raises:
+            Exception: when given polygon is opened
+
+        Returns:
+            List[List[Rhino.Geometry.PolylineCurve]]: grid by the aabb
+        """
+
         if not polygon.IsClosed:
             raise Exception("A given polygon is opened")
-        
-        world_x_line = rg.LineCurve(
-            rg.Point3d(0, 0, 0), rg.Point3d(1, 0, 0)
-        )
+
+        world_x_line = rg.LineCurve(rg.Point3d(0, 0, 0), rg.Point3d(1, 0, 0))
         aabb = LineHelper.get_2d_obb_from_line(world_x_line, polygon)
         aabb = aabb.ToNurbsCurve()
         aabb_exploded = aabb.DuplicateSegments()
-        
+
         x_seg, _, _, y_seg = aabb_exploded
         x_count = int(math.ceil(x_seg.GetLength() / grid_size))
         y_count = int(math.ceil(y_seg.GetLength() / grid_size))
-        
+
         x_seg_vector = PointHelper.get_normalized_vector(
             x_seg.PointAtEnd - x_seg.PointAtStart
         )
-        
+
         y_seg_vector = PointHelper.get_normalized_vector(
             y_seg.PointAtStart - y_seg.PointAtEnd
         )
-        
+
         start_pt = x_seg.PointAtStart
-        
+
         grid = []
         for yc in range(y_count):
             curr_y_vector = y_seg_vector * yc * grid_size
-            
+
             grid_row = []
             for xc in range(x_count):
                 curr_x_vector = x_seg_vector * xc * grid_size
-                
+
                 grid_p1 = start_pt + curr_y_vector + curr_x_vector
                 grid_p2 = grid_p1 + x_seg_vector * grid_size
                 grid_p3 = grid_p2 + y_seg_vector * grid_size
                 grid_p4 = grid_p3 - x_seg_vector * grid_size
-                
+
                 cell = rg.PolylineCurve(
                     [grid_p1, grid_p2, grid_p3, grid_p4, grid_p1]
                 )
-                
+
                 grid_row.append(cell)
             grid.append(grid_row)
-        
+
         if return_to_tree:
             return list_to_tree(grid)
-        
+
         return grid
+
+    @staticmethod
+    def get_maximal_rectangle(
+        polygon, rotation_degree, grid_size, is_strict=False
+    ):
+        """Estimates the maximum inner rectangle of the given polygon by `rotation_degree` and `grid_size`
+
+        Args:
+            polygon (Rhino.Geometry.PolylineCurve): polygon to estimate
+            rotation_degree (float): rotation step
+            grid_size (float): size of the grid each cell
+            is_strict (bool, optional): if true, only uses fully inner cells. Defaults to False.
+
+        Returns:
+            Rhino.Geometry.PolylineCurve: estimated maximal rectangle
+        """
+
+        anchor = rg.AreaMassProperties.Compute(polygon).Centroid
+
+        maximal_rectangle = None
+        inverse_angle = 0
+
+        for each_degree in range(0, 359, rotation_degree):
+            each_angle = math.radians(each_degree)
+
+            rotation_transform = rg.Transform.Rotation(each_angle, anchor)
+
+            rotated_polygon = copy.copy(polygon)
+            rotated_polygon.Transform(rotation_transform)
+
+            grid = LineHelper.get_2d_grid_by_aabb(
+                rotated_polygon, grid_size=grid_size, return_to_tree=False
+            )
+
+            binary_grid = NumericHelper.get_binary_grid(
+                rotated_polygon, grid, is_centroid=not is_strict
+            )
+
+            # pylint: disable=unbalanced-tuple-unpacking
+            (
+                top_left,
+                bottom_right,
+            ) = NumericHelper.get_maximal_rectangle_of_binary_grid_indices(
+                binary_grid
+            )
+            # pylint: enable=unbalanced-tuple-unpacking
+
+            row_range = range(top_left[0], bottom_right[0] + 1)
+            col_range = range(top_left[1], bottom_right[1] + 1)
+
+            maximal_rectangle_elements = []
+            for ri in row_range:
+                for ci in col_range:
+                    maximal_rectangle_elements.append(grid[::-1][ri][ci])
+
+            each_maximal_rectangle = rg.Curve.CreateBooleanUnion(
+                maximal_rectangle_elements
+            )[0]
+
+            if maximal_rectangle is None:
+                maximal_rectangle = each_maximal_rectangle
+
+            largest_rectangle_area = rg.AreaMassProperties.Compute(
+                maximal_rectangle
+            ).Area
+
+            each_rectangle_area = rg.AreaMassProperties.Compute(
+                each_maximal_rectangle
+            ).Area
+
+            if each_rectangle_area > largest_rectangle_area:
+                maximal_rectangle = each_maximal_rectangle
+                inverse_angle = -each_angle
+
+        if maximal_rectangle is not None:
+            inverse_transform = rg.Transform.Rotation(inverse_angle, anchor)
+            maximal_rectangle.Transform(inverse_transform)
+
+        return maximal_rectangle
 
 
 class NumericHelper:
@@ -603,38 +694,93 @@ class NumericHelper:
         return all(
             NumericHelper.is_close(num, target, tolerance) for num in nums
         )
-        
+
     @staticmethod
     def get_binary_grid(polygon, grid, is_centroid=False):
-        
-        binary_void = "0"
-        binary_solid = "1"
-        
+        """Creates a binary matrix by the given `polygon` and `grid` cells
+
+        Args:
+            polygon (Rhino.Geometry.PolylineCurve): polygon to binarize
+            grid (List[List[Rhino.Geometry.PolylineCurve]]): grid geometries
+            is_centroid (bool, optional): if false, only uses fully inner cells. Defaults to False.
+
+        Returns:
+            List[List[str]]: binary matrix consisting of "1"s and "0"s
+        """
+
         binary_grid = []
         for grid_row in reversed(grid):
             binary_grid_row = []
-            
+
             for cell in grid_row:
                 if is_centroid:
                     cell_centroid = rg.AreaMassProperties.Compute(cell).Centroid
-                    if polygon.Contains(cell_centroid) == rg.PointContainment.Inside:
-                        binary_grid_row.append(binary_solid)
+                    if (
+                        polygon.Contains(cell_centroid)
+                        == rg.PointContainment.Inside
+                    ):
+                        binary_grid_row.append(ConstsCollection.BINARY_SOLID)
                     else:
-                        binary_grid_row.append(binary_void)
-                    
+                        binary_grid_row.append(ConstsCollection.BINARY_VOID)
+
                 else:
                     cell_vertices = LineHelper.get_curve_vertices(cell)
                     if all(
-                        polygon.Contains(vertex) == rg.PointContainment.Inside 
+                        polygon.Contains(vertex) == rg.PointContainment.Inside
                         for vertex in cell_vertices
                     ):
-                        binary_grid_row.append(binary_solid)
+                        binary_grid_row.append(ConstsCollection.BINARY_SOLID)
                     else:
-                        binary_grid_row.append(binary_void)
-                        
+                        binary_grid_row.append(ConstsCollection.BINARY_VOID)
+
             binary_grid.append(binary_grid_row)
-        
+
         return binary_grid
+
+    @staticmethod
+    def get_maximal_rectangle_of_binary_grid_indices(binary_grid):
+        """Compute the maximum rectangle of a 2d binary grid
+
+        Args:
+            binary_grid (List[List[str]]): binary grid to compute the maximum rectangle indices
+
+        Returns:
+            Tuple[Tuple[int]]: top left indices and bottom right indices
+        """
+
+        if not binary_grid or not binary_grid[0]:
+            return 0, (), ()
+        _, col_num = len(binary_grid), len(binary_grid[0])
+        height = [0] * (col_num + 1)
+        max_area = 0
+        top_left = ()
+        bottom_right = ()
+
+        for ri, row in enumerate(binary_grid):
+            for hi in range(col_num):
+                height[hi] = (
+                    height[hi] + 1
+                    if row[hi] == ConstsCollection.BINARY_SOLID
+                    else 0
+                )
+
+            stack = [-1]
+            for ci in range(col_num + 1):
+                while height[stack[-1]] > height[ci]:
+                    hi = stack.pop()
+                    h = height[hi]
+                    w = ci - stack[-1] - 1
+
+                    area = h * w
+                    if max_area < area:
+                        max_area = area
+
+                        top_left = (ri - h + 1, stack[-1] + 1)
+                        bottom_right = (ri, ci - 1)
+
+                stack.append(ci)
+
+        return top_left, bottom_right
 
 
 class SurfaceHelper:
@@ -913,22 +1059,3 @@ class StringHelper:
                     geometry_list.append(polyline)
 
         return geometry_list
-
-
-grid = LineHelper.get_2d_grid_by_aabb(
-    y,
-    x,
-    grid_size=1.1,
-    return_to_tree=False
-)
-
-a = LineHelper.get_2d_grid_by_aabb(
-    y,
-    x,
-    grid_size=1.1,
-    return_to_tree=True
-)
-
-print(NumericHelper.get_binary_grid(x, grid, is_centroid=False))
-
-
