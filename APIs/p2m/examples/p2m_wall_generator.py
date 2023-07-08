@@ -13,6 +13,8 @@ class WallGenerator:
         self.height = height
 
     def generate(self):
+        """generate walls"""
+
         self.wall_coordinates = self._get_wall_coordinates()
         self.wall_polylines = self._get_wall_polylines()
         self.walls = self._get_walls()

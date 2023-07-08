@@ -7,7 +7,7 @@ class Request:
     def __init__(self, common_url):
         self.common_url = common_url
 
-    def _request_get(self, url, data):
+    def _request_get(self, url, data):  # pylint: disable=unused-argument
         """GET request method for flask API"""
 
         return
