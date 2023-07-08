@@ -596,6 +596,9 @@ class LineHelper:
 
         Returns:
             Rhino.Geometry.PolylineCurve: estimated maximal rectangle
+            
+        Reference:
+            https://leetcode.com/problems/maximal-rectangle/solutions/3407011/ex-amazon-explains-a-solution-with-a-video-python-javascript-java-and-c/
         """
 
         anchor = rg.AreaMassProperties.Compute(polygon).Centroid
