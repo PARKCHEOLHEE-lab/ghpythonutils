@@ -101,7 +101,7 @@ class MaximalInnerRectangleHelper:
         return maximal_rectangle
 
     def _generate_maximal_inner_rectangle(
-        self, polygon, rotation_degree, grid_size, is_strict
+        self, polygon, rotation_degree, grid_size, is_strict, is_parallel
     ):
         """Estimates the maximum inner rectangle of the given polygon by `rotation_degree` and `grid_size`
 
@@ -110,6 +110,7 @@ class MaximalInnerRectangleHelper:
             rotation_degree (float): rotation step
             grid_size (float): size of the grid each cell
             is_strict (bool, optional): if true, only uses fully inner cells. Defaults to False.
+            is_parallel (bool, optional): if true, run on parallelly. Defaults to False.
 
         Returns:
             Rhino.Geometry.PolylineCurve: estimated maximal rectangle
@@ -144,7 +145,18 @@ class MaximalInnerRectangleHelper:
 
             each_degree += rotation_degree
 
-        mirs = ghpythonlib.parallel.run(self._get_each_mir, mir_args_list, True)
+        # Parallel execution
+        if is_parallel:
+            mirs = ghpythonlib.parallel.run(
+                self._get_each_mir, mir_args_list, True
+            )
+
+        # Sequential execution
+        else:
+            mirs = [
+                self._get_each_mir(each_args) for each_args in mir_args_list
+            ]
+
         mir = max(
             list(mirs), key=lambda m: rg.AreaMassProperties.Compute(m).Area
         )
@@ -153,11 +165,19 @@ class MaximalInnerRectangleHelper:
 
 
 class MaximalInnerRectangle(MaximalInnerRectangleHelper):
-    def __init__(self, polygon, rotation_degree, grid_size, is_strict=True):
+    def __init__(
+        self,
+        polygon,
+        rotation_degree,
+        grid_size,
+        is_strict=True,
+        is_parallel=True,
+    ):
         self.polygon = polygon
         self.rotation_degree = rotation_degree
         self.grid_size = grid_size
         self.is_strict = is_strict
+        self.is_parallel = is_parallel
 
         self._generate()
 
@@ -165,13 +185,13 @@ class MaximalInnerRectangle(MaximalInnerRectangleHelper):
         st = time.time()
 
         self.mir = self._generate_maximal_inner_rectangle(
-            self.polygon, self.rotation_degree, self.grid_size, self.is_strict
+            self.polygon, self.rotation_degree, self.grid_size, self.is_strict, self.is_parallel
         )
 
         print("Time taken:", time.time() - st)
 
 
 # if __name__ == "__main__":
-#     mir = MaximalInnerRectangle(
-#         polygon=x, rotation_degree=4, grid_size=10, is_strict=True
-#     ).mir
+#    mir = MaximalInnerRectangle(
+#        polygon=x, rotation_degree=4, grid_size=10, is_strict=True, is_parallel=True
+#    ).mir
