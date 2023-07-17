@@ -185,7 +185,11 @@ class MaximalInnerRectangle(MaximalInnerRectangleHelper):
         st = time.time()
 
         self.mir = self._generate_maximal_inner_rectangle(
-            self.polygon, self.rotation_degree, self.grid_size, self.is_strict, self.is_parallel
+            self.polygon,
+            self.rotation_degree,
+            self.grid_size,
+            self.is_strict,
+            self.is_parallel,
         )
 
         print("Time taken:", time.time() - st)
