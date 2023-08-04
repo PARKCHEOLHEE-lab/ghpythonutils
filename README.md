@@ -1,5 +1,5 @@
 ## GhPython Utilities
-`ghpythonutils` serves as a utility for GhPython users engaged in the development of components, algorithms, automation tools, and other functionalities. For reference, this project is always a work in progress. Therefore, <u>if you have any ideas, questions, or suggestions, please feel free to create [new issues](https://github.com/PARKCHEOLHEE-lab/ghpythonutils/issues).</u>
+`ghpythonutils` serves as a utility for GhPython users engaged in the development of components, algorithms, automation tools, and other functionalities. For reference, this project is always a work in progress. Therefore, __if you have any ideas, questions, or suggestions, please feel free to create [new issues](https://github.com/PARKCHEOLHEE-lab/ghpythonutils/issues).__
 <br><br>
 
 
@@ -19,4 +19,6 @@ git clone git@github.com:PARKCHEOLHEE-lab/ghpythonutils.git
 ### Usage
 Upon successful installation, you can import modules from `ghpythonutils` using the following syntax. Additionally, it is possible to either inherit your class or utilize functions statically.
 
-![Alt text](./assets/usage.png)
+<p align="center">
+    <img src="./assets/usage.png">
+</p>
