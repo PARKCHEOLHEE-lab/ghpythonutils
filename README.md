@@ -1,5 +1,5 @@
 ## GhPython Utilities
-`ghpythonutils` serves as a utility for GhPython users engaged in the development of components, algorithms, automation tools, and other functionalities. For reference, this project is always a work in progress. Therefore, <u>if you have any ideas, questions, or suggestions, please feel free to create [new issues](https://github.com/PARKCHEOLHEE-lab/ghpythonutils/issues).</u>
+`ghpythonutils` serves as a utility for GhPython users engaged in the development of components, algorithms, automation tools, and other functionalities. For reference, this project is always a work in progress. Therefore, _if you have any ideas, questions, or suggestions, please feel free to create [new issues](https://github.com/PARKCHEOLHEE-lab/ghpythonutils/issues)._
 <br><br>
 
 
