@@ -10,7 +10,7 @@ cd `C:\Users\<UserName>\AppData\Roaming\McNeel\Rhinoceros\7.0\Plug-ins\IronPytho
 ```
 <br>
 
-If you are done to change the working directory, clone this repository as follows:
+Once you have successfully changed the working directory, proceed to clone this repository using the following command:
 ```
 git clone git@github.com:PARKCHEOLHEE-lab/ghpythonutils.git
 ```
