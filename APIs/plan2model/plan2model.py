@@ -5,7 +5,7 @@ import numpy as np
 from shapely.geometry import Polygon
 
 
-class P2M:
+class Plan2Model:
     # for open-cv
     THRESHOLD_BINARY = 50
     MAXVAL = 255
