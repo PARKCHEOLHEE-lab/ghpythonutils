@@ -5,6 +5,7 @@ repos:
     rev: v3.2.0
     hooks:
     -   id: trailing-whitespace
+        exclude: ^APIs/mesh2points/data/
     -   id: end-of-file-fixer
     -   id: check-added-large-files
 
@@ -13,14 +14,18 @@ repos:
     hooks:
     -   id: black
         language_version: python3.9.7
-        exclude: doc/|monitoring/|scripts/|tool/|test/
+        exclude: ^(doc|monitoring|scripts|tool|test)/|APIs/mesh2points/data/ModelNet10/
 
 -   repo: https://github.com/PyCQA/pylint
     rev: v2.14.0
     hooks:
     -   id: pylint
+        exclude: ^APIs/mesh2points/data/
 
 -   repo: https://github.com/pycqa/isort
     rev: ''
     hooks:
     -   id: isort
+        exclude: ^APIs/mesh2points/data/
+
+exclude: ^(APIs/mesh2points/data/ModelNet10/README\.txt)|^README\.md$
