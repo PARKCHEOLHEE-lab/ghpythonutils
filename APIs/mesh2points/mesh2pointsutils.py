@@ -9,7 +9,7 @@ def point_cloud_show(*args: np.ndarray, labels: List[str] = None) -> None:
     os.environ["KMP_DUPLICATE_LIB_OK"] = "True"
 
     if labels is not None:
-        assert len(args) == len(labels)
+        assert len(args) == len(labels), "The length between the given `args` and `labels` is different."
 
     fig = plt.figure()
     ax = fig.add_subplot(111, projection="3d")
