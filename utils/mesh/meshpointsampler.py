@@ -9,7 +9,7 @@ class MeshPointSamplerHelper:
         """Compute the area of triangle
 
         Args:
-            triangle (List[Point3d]): Vertices of a triangle 
+            triangle (List[Point3d]): Vertices of a triangle
 
         Returns:
             float: The area
