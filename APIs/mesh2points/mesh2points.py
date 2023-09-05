@@ -1,6 +1,8 @@
 import glob
+import math
 import os
 import random
+from typing import List, Tuple, Union
 
 import numpy as np
 import torch
@@ -8,6 +10,8 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torch.utils.data import Dataset
 from torchvision import transforms, utils
+
+from APIs.mesh2points.mesh2pointsutils import point_cloud_show
 
 random.seed(777)
 
@@ -52,49 +56,56 @@ class PointSampler:
     def _compute_triangle_area(
         self, point_1: np.ndarray, point_2: np.ndarray, point_3: np.ndarray
     ) -> float:
-        x1, y1, z1 = point_1
-        x2, y2, z2 = point_2
-        x3, y3, z3 = point_3
-
-        area = 0.5 * abs(
-            x1 * (y2 * z3 - y3 * z2)
-            + x2 * (y3 * z1 - y1 * z3)
-            + x3 * (y1 * z2 - y2 * z1)
+        side_a = math.sqrt(
+            (point_2[0] - point_3[0]) ** 2
+            + (point_2[1] - point_3[1]) ** 2
+            + (point_2[2] - point_3[2]) ** 2
         )
+        side_b = math.sqrt(
+            (point_1[0] - point_3[0]) ** 2
+            + (point_1[1] - point_3[1]) ** 2
+            + (point_1[2] - point_3[2]) ** 2
+        )
+        side_c = math.sqrt(
+            (point_1[0] - point_2[0]) ** 2
+            + (point_1[1] - point_2[1]) ** 2
+            + (point_1[2] - point_2[2]) ** 2
+        )
+
+        s = (side_a + side_b + side_c) / 2
+
+        formula = s * (s - side_a) * (s - side_b) * (s - side_c)
+        area = 0
+        if formula > 0:
+            area = math.sqrt(formula)
 
         return area
 
     def _compute_sample_point(
         self, point_1: np.ndarray, point_2: np.ndarray, point_3: np.ndarray
     ):
-        start, end = sorted([random.random(), random.random()])
+        u = random.uniform(0, 1)
+        v = random.uniform(0, 1 - u)
+        w = 1 - u - v
 
-        random_x = (
-            start * point_1[0]
-            + (end - start) * point_2[0]
-            + (1 - end) * point_3[0]
-        )
-        random_y = (
-            start * point_1[1]
-            + (end - start) * point_2[1]
-            + (1 - end) * point_3[1]
-        )
-        random_z = (
-            start * point_1[2]
-            + (end - start) * point_2[2]
-            + (1 - end) * point_3[2]
-        )
+        random_point = [
+            u * point_1[0] + v * point_2[0] + w * point_3[0],
+            u * point_1[1] + v * point_2[1] + w * point_3[1],
+            u * point_1[2] + v * point_2[2] + w * point_3[2],
+        ]
 
-        return (random_x, random_y, random_z)
+        return random_point
 
-    def __call__(self, mesh):
-        verts, faces = mesh
-        verts = np.array(verts)
+    def __call__(self, mesh: Union[List[np.ndarray], Tuple[np.ndarray]]):
+        vertices, faces = mesh
+        vertices = np.array(vertices)
         areas = np.zeros((len(faces)))
 
         for i in range(len(areas)):
             areas[i] = self._compute_triangle_area(
-                verts[faces[i][0]], verts[faces[i][1]], verts[faces[i][2]]
+                vertices[faces[i][0]],
+                vertices[faces[i][1]],
+                vertices[faces[i][2]],
             )
 
         sampled_faces = random.choices(
@@ -105,9 +116,9 @@ class PointSampler:
 
         for i in range(len(sampled_faces)):
             sampled_points[i] = self._compute_sample_point(
-                verts[sampled_faces[i][0]],
-                verts[sampled_faces[i][1]],
-                verts[sampled_faces[i][2]],
+                vertices[sampled_faces[i][0]],
+                vertices[sampled_faces[i][1]],
+                vertices[sampled_faces[i][2]],
             )
 
         return sampled_points
@@ -188,9 +199,16 @@ if __name__ == "__main__":
     data_sofa_sample = glob.glob(
         os.path.abspath(os.path.join(data_dir, "sofa/train/*"))
     )[sample_index]
-    vertices, faces = load_point_cloud(data_sofa_sample)
+    sofa_sample_vertices, sofa_sample_faces = load_point_cloud(data_sofa_sample)
 
-    point_cloud = PointSampler(1024)((vertices, faces))
+    sofa_sample_point_cloud = PointSampler(1024)(
+        (sofa_sample_vertices, sofa_sample_faces)
+    )
+    point_cloud_show(
+        sofa_sample_vertices,
+        sofa_sample_point_cloud,
+        labels=["sofa_sample_vertices", "sofa_sample_point_cloud"],
+    )
 
     train_dataset = PointCloudData(data_dir=data_dir, transform=None)
     valid_dataset = PointCloudData(
