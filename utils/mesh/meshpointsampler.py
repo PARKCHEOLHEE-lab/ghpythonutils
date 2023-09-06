@@ -59,6 +59,53 @@ class MeshPointSamplerHelper:
 
         return rg.Point3d(*random_point)
 
+    def _normalize_sampled_points(self, point_cloud):
+        """Normalize given point cloud (centralization to (0, 0, 0) and normalization to a unit sphere)
+
+        Args:
+            point_cloud (List[Point3d]): Existing point cloud
+
+        Returns:
+            List[Point3d]: Normalized point cloud
+        """
+
+        mean_point = [0, 0, 0]
+        for point in point_cloud:
+            mean_point[0] += point[0]
+            mean_point[1] += point[1]
+            mean_point[2] += point[2]
+
+        mean_point[0] /= len(point_cloud)
+        mean_point[1] /= len(point_cloud)
+        mean_point[2] /= len(point_cloud)
+
+        centralized_point_cloud = []
+        for point in point_cloud:
+            centralized_point = [
+                point[0] - mean_point[0],
+                point[1] - mean_point[1],
+                point[2] - mean_point[2],
+            ]
+
+            centralized_point_cloud.append(centralized_point)
+
+        max_norm = 0
+        for point in centralized_point_cloud:
+            norm = math.sqrt(point[0] ** 2 + point[1] ** 2 + point[2] ** 2)
+            if norm > max_norm:
+                max_norm = norm
+
+        normalized_point_cloud = []
+        for point in centralized_point_cloud:
+            normalized_point = [
+                point[0] / max_norm,
+                point[1] / max_norm,
+                point[2] / max_norm,
+            ]
+            normalized_point_cloud.append(rg.Point3d(*normalized_point))
+
+        return normalized_point_cloud
+
     @staticmethod
     def get_mesh_vertices(mesh):
         """Get the all vertices of a mesh
@@ -87,9 +134,10 @@ class MeshPointSamplerHelper:
 
 
 class MeshPointSampler(MeshPointSamplerHelper):
-    def __init__(self, mesh, output_size, seed=0):
+    def __init__(self, mesh, output_size, normalize=False, seed=0):
         self.mesh = mesh
         self.output_size = output_size
+        self.normalize = normalize
         self.seed = seed
 
         random.seed(self.seed)
@@ -125,14 +173,17 @@ class MeshPointSampler(MeshPointSamplerHelper):
 
             sampled_faces.append(mesh_vertices[index])
 
-        sampled_points = [[0, 0, 0] for _ in range(self.output_size)]
+        sampled_points = [rg.Point3d(0, 0, 0) for _ in range(self.output_size)]
 
         for i in range(len(sampled_faces)):
             sampled_points[i] = self._compute_sample_point(sampled_faces[i])
+
+        if self.normalize:
+            sampled_points = self._normalize_sampled_points(sampled_points)
 
         return sampled_points
 
 
 if __name__ == "__main__":
-    sampler = MeshPointSampler(mesh, 1024)
+    sampler = MeshPointSampler(mesh=mesh, output_size=1024, normalize=True)
     sampled_points = sampler.sampling()
